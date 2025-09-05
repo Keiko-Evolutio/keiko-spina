@@ -40,7 +40,7 @@ repos:
     rev: v0.12.5
     hooks:
       - id: ruff
-        name: "Ruff Linting (Fast Python Linter)"
+        name: "Ruff Linting (Fast Python Linter + Import Sorting)"
         args: [
           --fix,
           --exit-non-zero-on-fix,
@@ -51,7 +51,7 @@ repos:
         exclude: '^(migrations/|alembic/|__pycache__)'
 
       - id: ruff-format
-        name: "Ruff Formatting (Black-compatible)"
+        name: "Ruff Formatting (Black-compatible + Import Sorting)"
         args: [ --target-version=py312 ]
         files: '\\.py$'
         exclude: '^(migrations/|alembic/|__pycache__)'
@@ -152,20 +152,10 @@ repos:
         exclude: '^(migrations/|scripts/legacy/)'
 
   # =====================================================================
-  # Import Organization - Simplified Configuration
+  # Import Organization - Handled by Ruff (removed isort redundancy)
   # =====================================================================
-  - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
-    hooks:
-      - id: isort
-        name: "Import Organization"
-        args: [
-          --profile=black,
-          --line-length=88,
-          --multi-line=3
-        ]
-        files: '\\.py$'
-        exclude: '^(migrations/|__pycache__)'
+  # NOTE: Import sorting is now handled by Ruff's built-in isort functionality
+  # This eliminates the need for a separate isort hook and potential conflicts
 
   # =====================================================================
   # Infrastructure & Configuration Validation

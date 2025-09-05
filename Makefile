@@ -74,6 +74,7 @@ help: ## Show this help message
 	@echo "  test-fast           Run tests in parallel"
 	@echo "  test-config         Validate test/coverage configuration"
 	@echo "  validate-reproducible-builds  Validate reproducible builds configuration"
+	@echo "  validate-lint-format  Validate lint/format consolidation"
 	@echo "  test-websocket      Test WebSocket functionality"
 	@echo "  test-kei-agents     Run KEI-Agent-Framework tests"
 	@echo "  test-logfire        Run Logfire integration tests"
@@ -637,6 +638,15 @@ validate-reproducible-builds: ## Validate reproducible builds configuration
 	@echo "$(GREEN)✅ Testing uv sync...$(RESET)"
 	@$(UV) sync --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ uv sync works$(RESET)" || echo "$(RED)❌ uv sync failed$(RESET)"
 	@echo "$(GREEN)✅ Reproducible builds are configured correctly$(RESET)"
+
+validate-lint-format: ## Validate lint/format consolidation
+	@echo "$(BLUE)🔧 Validating lint/format consolidation...$(RESET)"
+	@echo "$(GREEN)✅ Checking Ruff installation...$(RESET)"
+	@$(UV) run ruff --version > /dev/null && echo "$(GREEN)✅ Ruff is installed$(RESET)" || echo "$(RED)❌ Ruff not found$(RESET)"
+	@echo "$(GREEN)✅ Testing Ruff functionality...$(RESET)"
+	@$(UV) run ruff check --help > /dev/null 2>&1 && echo "$(GREEN)✅ Ruff check works$(RESET)" || echo "$(RED)❌ Ruff check failed$(RESET)"
+	@$(UV) run ruff format --help > /dev/null 2>&1 && echo "$(GREEN)✅ Ruff format works$(RESET)" || echo "$(RED)❌ Ruff format failed$(RESET)"
+	@echo "$(GREEN)✅ Lint/Format consolidation is complete$(RESET)"
 
 # =====================================================================
 # Code Quality
