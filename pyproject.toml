@@ -226,7 +226,7 @@ deployment = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py312"
 line-length = 100
 select = [
     "E",
@@ -273,7 +273,7 @@ split-on-trailing-comma = true
 convention = "google"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -364,7 +364,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = [
-    "backend",
+    ".",
 ]
 omit = [
     "*/tests/*",
@@ -455,16 +455,39 @@ name = "cz_conventional_commits"
 version = "1.0.0"
 tag_format = "v$version"
 version_files = [
-    "backend/pyproject.toml:version",
-    "backend/__init__.py:__version__",
+    "pyproject.toml:version",
+    "__init__.py:__version__",
 ]
 
 [tool.hatch.version]
-path = "backend/__init__.py"
+path = "__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "backend",
+    "agents",
+    "api", 
+    "app",
+    "audit_system",
+    "auth",
+    "config",
+    "core",
+    "data_models",
+    "kei_logging",
+    "messaging",
+    "middleware",
+    "monitoring",
+    "observability",
+    "policy_engine",
+    "quotas_limits",
+    "security",
+    "services",
+    "specs",
+    "storage",
+    "task_management",
+    "utils",
+    "voice",
+    "voice_performance",
+    "voice_rate_limiting",
 ]
 
 [tool.hatch.envs.default]

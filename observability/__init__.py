@@ -509,12 +509,12 @@ async def stop_observability_system() -> bool:
                 success = False
 
         # Stoppe Logfire-Integration
-        if LOGFIRE_INTEGRATION_AVAILABLE:
+        if LOGFIRE_INTEGRATION_AVAILABLE and shutdown_logfire:
             try:
                 shutdown_logfire()
-                logger.info("Logfire-Integration gestoppt")
+                logger.debug("Logfire-Integration gestoppt")
             except Exception as e:
-                logger.warning(f"Logfire-Stop fehlgeschlagen: {e}")
+                logger.debug(f"Logfire-Stop fehlgeschlagen (erwartet bei mehrfachem Aufruf): {e}")
 
         # Stoppe Tracing
         if OPENTELEMETRY_AVAILABLE:
