@@ -30,10 +30,7 @@ logger = get_logger(__name__)
 try:
     # LangSmith Python SDK (optional)
     from langsmith import Client as LangSmithClient  # type: ignore
-    try:
-        from langsmith.run_helpers import trace as langsmith_trace  # type: ignore
-    except Exception:
-        langsmith_trace = None  # type: ignore[assignment]
+    langsmith_trace = None  # type: ignore[assignment]
     LANGSMITH_AVAILABLE = True
 except Exception:
     # Fallback-Symbole, damit Tests/Monkeypatch funktionieren

@@ -37,6 +37,9 @@ from .logfire_config import (
     validate_logfire_config,
 )
 
+# String-Konstanten zur Vermeidung von Duplikationen
+ALREADY_INSTRUMENTED_MSG = "already instrumented"
+
 logger = get_logger(__name__)
 
 
@@ -280,7 +283,7 @@ class LogfireManager:
             error_msg = str(e).lower()
             if "shutdown can only be called once" in error_msg:
                 logger.debug("⚠️ Logfire bereits konfiguriert (shutdown-Fehler erwartet)")
-            elif "already instrumented" in error_msg:
+            elif ALREADY_INSTRUMENTED_MSG in error_msg:
                 logger.debug("⚠️ Logfire bereits instrumentiert")
             else:
                 raise  # Unbekannte Fehler weiterwerfen
@@ -316,7 +319,7 @@ class LogfireManager:
                     logger.debug(f"✅ {name.title()}-Instrumentierung aktiviert")
                 except Exception as e:
                     error_msg = str(e).lower()
-                    if "already instrumented" in error_msg:
+                    if ALREADY_INSTRUMENTED_MSG in error_msg:
                         self._instrumentation_status[name] = True
                         logger.debug(f"⚠️ {name.title()}-Instrumentierung bereits aktiv")
                     else:
@@ -328,7 +331,7 @@ class LogfireManager:
         try:
             logfire.instrument_openai()
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_anthropic(self) -> None:
@@ -339,7 +342,7 @@ class LogfireManager:
         except ImportError:
             raise ImportError("Anthropic package nicht installiert. Installieren Sie mit: pip install anthropic")
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_httpx(self) -> None:
@@ -347,7 +350,7 @@ class LogfireManager:
         try:
             logfire.instrument_httpx()
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_requests(self) -> None:
@@ -355,7 +358,7 @@ class LogfireManager:
         try:
             logfire.instrument_requests()
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_sqlalchemy(self) -> None:
@@ -366,7 +369,7 @@ class LogfireManager:
         except ImportError:
             raise ImportError("SQLAlchemy package nicht installiert. Installieren Sie mit: pip install 'logfire[sqlalchemy]'")
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_pydantic(self) -> None:
@@ -374,7 +377,7 @@ class LogfireManager:
         try:
             logfire.instrument_pydantic()
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def _instrument_system_metrics(self) -> None:
@@ -386,7 +389,7 @@ class LogfireManager:
         except ImportError:
             raise ImportError("System-Metrics package nicht installiert. Installieren Sie mit: pip install 'logfire[system-metrics]'")
         except Exception as e:
-            if "already instrumented" not in str(e).lower():
+            if ALREADY_INSTRUMENTED_MSG not in str(e).lower():
                 raise
 
     def instrument_fastapi_app(self, app) -> None:
@@ -403,7 +406,7 @@ class LogfireManager:
                 logger.debug("✅ FastAPI-Instrumentierung aktiviert")
             except Exception as e:
                 error_msg = str(e).lower()
-                if "already instrumented" in error_msg:
+                if ALREADY_INSTRUMENTED_MSG in error_msg:
                     self._instrumentation_status["fastapi"] = True
                     logger.debug("⚠️ FastAPI-Instrumentierung bereits aktiv")
                 else:

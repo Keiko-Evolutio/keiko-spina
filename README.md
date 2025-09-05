@@ -418,6 +418,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ by the Keiko Team**
-
-Analysiere den Fehler-Report.
-Erstelle dir für jeden Fehler und jede Warnung einen Task in deiner Task List!

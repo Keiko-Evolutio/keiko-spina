@@ -313,7 +313,7 @@ class UpdateFactory:
     """Factory für Update-Erstellung mit konsolidierten Methoden."""
 
     @staticmethod
-    def _create_base_update(update_type: UpdateType) -> str:
+    def _create_base_update(_update_type: UpdateType) -> str:
         """Erstelle Basis-Update-ID für alle Update-Typen."""
         return generate_uuid()
 

@@ -319,3 +319,4 @@ coverage/
 .vscode/settings.json.bak
 /CLAUDE.md
 /openapi.json
+/SonarCube.md

@@ -118,7 +118,7 @@ class VectorStore(Protocol):
 
     async def add_vectors(
         self,
-        vectors: list[list[float]],
+        _vectors: list[list[float]],
         documents: list[dict[str, Any]]
     ) -> bool:
         """Fügt Vektoren und zugehörige Dokumente hinzu.

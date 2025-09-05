@@ -636,6 +636,50 @@ def record_exception_in_span(exception: Exception, span_name: str | None = None,
                 current_span.set_attribute(key, value)
 
 
+async def _shutdown_logfire_integration() -> None:
+    """Beendet die Logfire-Integration."""
+    if LOGFIRE_INTEGRATION_AVAILABLE and shutdown_logfire:
+        try:
+            shutdown_logfire()
+            logger.debug("✅ Logfire-Integration von Tracing beendet")
+        except Exception as e:
+            logger.debug(f"⚠️ Fehler beim Beenden von Logfire (erwartet bei mehrfachem Aufruf): {e}")
+
+
+async def _shutdown_meter_provider() -> None:
+    """Beendet den MeterProvider mit Timeout-Schutz."""
+    global _meter_provider
+    
+    if not _meter_provider or not hasattr(_meter_provider, 'shutdown'):
+        return
+        
+    try:
+        import asyncio
+        # Use asyncio timeout to prevent hanging
+        await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None, _meter_provider.shutdown
+            ),
+            timeout=2.0  # Reduziertes Timeout
+        )
+        logger.debug("✅ MeterProvider shutdown erfolgreich")
+    except asyncio.TimeoutError:
+        logger.debug("⚠️ MeterProvider shutdown timeout - forciere shutdown (erwartet)")
+    except Exception as meter_e:
+        _handle_meter_provider_shutdown_error(meter_e)
+
+
+def _handle_meter_provider_shutdown_error(error: Exception) -> None:
+    """Behandelt MeterProvider shutdown Fehler."""
+    error_str = str(error).lower()
+    if "deadline already exceeded" in error_str:
+        logger.debug("⚠️ MeterProvider shutdown deadline exceeded (erwartet bei mehrfachem Aufruf)")
+    elif "shutdown can only be called once" in error_str:
+        logger.debug("⚠️ MeterProvider bereits beendet (erwartet bei mehrfachem Aufruf)")
+    else:
+        logger.warning(f"⚠️ MeterProvider shutdown fehlgeschlagen: {error}")
+
+
 async def shutdown_tracing() -> None:
     """Beendet Tracing sauber, inklusive Logfire-Integration."""
     global _tracer_provider, _meter_provider, _is_initialized, _shutdown_in_progress, _shutdown_completed
@@ -648,40 +692,15 @@ async def shutdown_tracing() -> None:
     _shutdown_in_progress = True
 
     try:
-        # Logfire-Integration beenden (falls verfügbar)
-        if LOGFIRE_INTEGRATION_AVAILABLE and shutdown_logfire:
-            try:
-                shutdown_logfire()
-                logger.debug("✅ Logfire-Integration von Tracing beendet")
-            except Exception as e:
-                logger.debug(f"⚠️ Fehler beim Beenden von Logfire (erwartet bei mehrfachem Aufruf): {e}")
+        # Logfire-Integration beenden
+        await _shutdown_logfire_integration()
 
         if not OPENTELEMETRY_AVAILABLE or not _is_initialized:
             return
 
         try:
             # Shutdown MeterProvider first with timeout protection
-            if _meter_provider and hasattr(_meter_provider, 'shutdown'):
-                try:
-                    import asyncio
-                    # Use asyncio timeout to prevent hanging
-                    await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(
-                            None, _meter_provider.shutdown
-                        ),
-                        timeout=2.0  # Reduziertes Timeout
-                    )
-                    logger.debug("✅ MeterProvider shutdown erfolgreich")
-                except asyncio.TimeoutError:
-                    logger.debug("⚠️ MeterProvider shutdown timeout - forciere shutdown (erwartet)")
-                except Exception as meter_e:
-                    # Spezielle Behandlung für "deadline already exceeded" Fehler
-                    if "deadline already exceeded" in str(meter_e).lower():
-                        logger.debug("⚠️ MeterProvider shutdown deadline exceeded (erwartet bei mehrfachem Aufruf)")
-                    elif "shutdown can only be called once" in str(meter_e).lower():
-                        logger.debug("⚠️ MeterProvider bereits beendet (erwartet bei mehrfachem Aufruf)")
-                    else:
-                        logger.warning(f"⚠️ MeterProvider shutdown fehlgeschlagen: {meter_e}")
+            await _shutdown_meter_provider()
             
             # Then shutdown TracerProvider
             if _tracer_provider and hasattr(_tracer_provider, 'shutdown'):

@@ -196,7 +196,7 @@ class CameraService:
         self,
         exc_type: type | None,
         exc: BaseException | None,
-        tb: Any | None
+        _tb: Any | None
     ) -> None:
         """Gibt die Kameraressourcen zuverlässig frei."""
         try:

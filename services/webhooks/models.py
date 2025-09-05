@@ -373,7 +373,7 @@ class WorkerPoolConfig(BaseModel):
         return normalized
 
     # Nach‑Validierung zur Konsistenz und Rückwärtskompatibilität
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, _context: Any) -> None:
         """Stellt Konsistenz zwischen neuen und alten Feldern her."""
         # worker_count stets mit pool_size spiegeln
         object.__setattr__(self, "worker_count", int(self.pool_size))

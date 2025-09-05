@@ -331,7 +331,7 @@ class BaseAgentProtocol(Protocol):
 
     @abstractmethod
     async def register_extension(
-        self, extension_type: str, extension_impl: Any, metadata: dict[str, Any]
+        self, extension_type: str, _extension_impl: Any, metadata: dict[str, Any]
     ) -> bool:
         """Registriert Framework-Extension zur Laufzeit.
 

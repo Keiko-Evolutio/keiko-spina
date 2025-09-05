@@ -627,6 +627,38 @@ def require_quota_compliance(
                             detail="Rate limit exceeded"
                         )
 
+                if budget_check and agent_id:
+                    # Berechne geschätzte Kosten für diesen Request
+                    context = {
+                        "agent_id": agent_id,
+                        "request": request,
+                        "endpoint": str(request.url.path),
+                        "method": request.method
+                    }
+                    
+                    # Erstelle temporäres Result-Objekt für Budget-Check
+                    from .models import QuotaEnforcementResult
+                    temp_result = QuotaEnforcementResult()
+                    
+                    # Importiere Budget-Manager
+                    from .budget_manager import budget_manager
+                    
+                    # Berechne geschätzte Kosten
+                    estimated_cost = 0.01  # Default-Schätzung
+                    agent_budgets = budget_manager.get_agent_budgets(agent_id)
+                    
+                    for budget_info in agent_budgets:
+                        if budget_info["is_exhausted"]:
+                            raise HTTPException(
+                                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                                detail=f"Budget exhausted for agent {agent_id}: {budget_info['budget_type']}"
+                            )
+                        elif budget_info["available_amount"] < estimated_cost:
+                            raise HTTPException(
+                                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                                detail=f"Insufficient budget for agent {agent_id}: {budget_info['budget_type']}"
+                            )
+
                 return await func(*args, **kwargs)
 
             except HTTPException:

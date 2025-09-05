@@ -29,7 +29,7 @@ try:
     from agents.tools import mcp_registry  # type: ignore
 except Exception:
     class MockRegistry:
-        async def revalidate_domains_if_needed(self, interval_hours):
+        async def revalidate_domains_if_needed(self, _interval_hours):
             return {}
         async def remove_server(self, server_name):
             pass

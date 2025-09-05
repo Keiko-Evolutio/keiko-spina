@@ -251,7 +251,7 @@ class PromptSanitizer:
         existing_violations: list[str]
     ) -> tuple[str, list[str], list[PromptThreat]]:
         """Wendet strategie-spezifische Sanitization an."""
-        violations = []
+        violations = existing_violations.copy()  # Bestehende Violations übernehmen
         threats = []
 
         if self.strategy in (SanitizationStrategy.BLACKLIST_ONLY, SanitizationStrategy.COMPREHENSIVE):

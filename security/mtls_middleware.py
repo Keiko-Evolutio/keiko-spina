@@ -22,7 +22,7 @@ except Exception:  # Fallback-Placebo Builder, NO-OP Überprüfung
             return self
         def build(self):
             class _Verifier:
-                def verify(self, cert, chain):  # noqa: ARG002
+                def verify(self, cert, _chain):  # noqa: ARG002
                     return []
             return _Verifier()
     class StoreBuilder:  # type: ignore

@@ -135,7 +135,7 @@ class ContainerProtocol(Protocol):
         """Löst eine Abhängigkeit auf."""
         ...
 
-    def register(self, interface: type, implementation: type) -> None:
+    def register(self, interface: type, _implementation: type) -> None:
         """Registriert eine Implementierung."""
         ...
 

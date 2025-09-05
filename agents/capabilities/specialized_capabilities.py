@@ -91,7 +91,7 @@ class ToolEndpoint:
 
     url: str
     method: str = "POST"
-    headers: dict[str, str] = None
+    headers: dict[str, str] | None = None
     timeout_seconds: int = 30
     retry_count: int = 3
 

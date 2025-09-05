@@ -144,7 +144,7 @@ async def create_token(
 
 @router.get("/list", response_model=TokenListResponse)
 async def list_tokens(
-    include_revoked: bool = Query(False, description="Include revoked tokens"),
+    _include_revoked: bool = Query(False, description="Include revoked tokens"),
     token_type: TokenType | None = Query(None, description="Filter by token type"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tokens to return"),
     offset: int = Query(0, ge=0, description="Number of tokens to skip"),
@@ -153,7 +153,7 @@ async def list_tokens(
     """List authentication tokens.
 
     Args:
-        include_revoked: Whether to include revoked tokens
+        _include_revoked: Whether to include revoked tokens
         token_type: Filter by specific token type
         limit: Maximum number of tokens to return
         offset: Number of tokens to skip

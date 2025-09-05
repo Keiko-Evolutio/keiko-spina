@@ -21,14 +21,13 @@ try:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa, padding
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.backends import default_backend
     CRYPTOGRAPHY_AVAILABLE = True
 except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
     # Fallback-Definitionen
     Cipher = algorithms = modes = hashes = serialization = None
-    rsa = padding = PBKDF2HMAC = default_backend = None
+    rsa = padding = default_backend = None
 
 from .exceptions import (
     EncryptionError, DecryptionError, KeyNotFoundError,

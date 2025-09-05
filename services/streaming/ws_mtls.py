@@ -29,7 +29,7 @@ except Exception:  # pragma: no cover
             class _Verifier:
                 """Placebo-Verifier, der keine Validierung durchführt."""
 
-                def verify(self, cert, chain):  # noqa: ARG002
+                def verify(self, cert, _chain):  # noqa: ARG002
                     return []
 
             return _Verifier()

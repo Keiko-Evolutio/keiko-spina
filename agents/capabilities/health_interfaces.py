@@ -274,6 +274,18 @@ class DefaultReadinessChecker(BaseReadinessChecker):
         if not self.dependencies:
             return True
 
+        # Prüfe jede Abhängigkeit
+        for dependency in self.dependencies:
+            try:
+                # Hier könnte eine echte Abhängigkeitsprüfung implementiert werden
+                # Für jetzt als nicht implementiert markieren
+                if hasattr(dependency, 'is_available'):
+                    if not await dependency.is_available():
+                        return False
+                # Fallback: Prüfung erfolgreich wenn keine Prüfmethode verfügbar
+            except Exception:
+                return False
+        
         return True
 HealthChecker = BaseHealthChecker
 ReadinessChecker = BaseReadinessChecker

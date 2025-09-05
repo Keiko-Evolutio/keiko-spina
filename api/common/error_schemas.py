@@ -86,7 +86,7 @@ class StructuredErrorResponse(BaseModel):
     error: str | None = Field(None, description="Legacy error field für Backward Compatibility")
     detail: str | None = Field(None, description="Legacy detail field für Backward Compatibility")
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, _context: Any) -> None:
         """Post-Initialisierung für Backward Compatibility."""
         # Legacy-Felder für Backward Compatibility setzen
         if not self.error:

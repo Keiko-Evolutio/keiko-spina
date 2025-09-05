@@ -93,6 +93,14 @@ help: ## Show this help message
 	@echo "  quality             Run all quality checks"
 	@echo "  quality-strict      Run all quality checks with strict typing"
 	@echo ""
+	@echo "$(GREEN)SonarQube Analysis:$(RESET)"
+	@echo "  sonar-setup         Setup SonarQube for local development"
+	@echo "  sonar-analyze       Run local SonarQube analysis"
+	@echo "  sonar-docker        Run SonarQube analysis using Docker"
+	@echo "  sonar-cloud         Run SonarCloud analysis"
+	@echo "  sonar-generate-reports  Generate all reports for analysis"
+	@echo "  sonar-clean         Clean SonarQube reports and cache"
+	@echo ""
 	@echo "$(GREEN)Utilities:$(RESET)"
 	@echo "  clean               Clean build artifacts"
 	@echo "  health-check        Check development environment"
@@ -814,6 +822,108 @@ setup-pre-commit: ## Setup pre-commit hooks
 	fi
 
 # =====================================================================
+# SonarQube Analysis
+# =====================================================================
+
+sonar-setup: ## Setup SonarQube for local development
+	@echo "$(BLUE)🔍 Setting up SonarQube for local analysis...$(RESET)"
+	@echo "$(GREEN)Prerequisites:$(RESET)"
+	@echo "  1. SonarQube server running on http://localhost:9000"
+	@echo "  2. SONAR_TOKEN environment variable set"
+	@echo "  3. SonarQube Scanner installed (sonar-scanner command available)"
+	@echo ""
+	@echo "$(YELLOW)💡 To start SonarQube locally:$(RESET)"
+	@echo "  docker run -d --name sonarqube -p 9000:9000 sonarqube:latest"
+	@echo ""
+	@echo "$(GREEN)✅ Configuration files created:$(RESET)"
+	@echo "  - sonar-project.properties (SonarQube configuration)"
+	@echo "  - .sonarqube-analysis.yml (Analysis workflow configuration)"
+
+sonar-generate-reports: test-cov security ## Generate all reports for SonarQube analysis
+	@echo "$(BLUE)📊 Generating reports for SonarQube analysis...$(RESET)"
+	# Generate coverage report in XML format
+	@$(PYTEST) --cov-report=xml --cov-report=term-missing --junitxml=pytest-junit.xml
+	# Generate Bandit security report in JSON format
+	@$(BANDIT) -r . -x tests/ -f json -o bandit-report.json || echo "$(YELLOW)⚠️ Bandit found security issues$(RESET)"
+	# Generate MyPy report in JSON format (if mypy supports it)
+	@$(MYPY) --no-error-summary --json-report mypy-report . > mypy-report.json 2>/dev/null || echo "$(YELLOW)⚠️ MyPy JSON report generation failed, using text report$(RESET)"
+	@echo "$(GREEN)✅ All reports generated for SonarQube analysis$(RESET)"
+	@echo "$(GREEN)📁 Generated files:$(RESET)"
+	@echo "  - coverage.xml (Coverage report)"
+	@echo "  - pytest-junit.xml (Test results)"
+	@echo "  - bandit-report.json (Security scan)"
+	@echo "  - mypy-report.json (Type checking)"
+
+sonar-analyze: sonar-generate-reports ## Run SonarQube analysis
+	@echo "$(BLUE)🔍 Running SonarQube analysis...$(RESET)"
+	@if command -v sonar-scanner >/dev/null 2>&1; then \
+		if [ -z "$$SONAR_TOKEN" ]; then \
+			echo "$(RED)❌ SONAR_TOKEN environment variable not set$(RESET)"; \
+			echo "$(YELLOW)Please set SONAR_TOKEN with your SonarQube authentication token$(RESET)"; \
+			exit 1; \
+		fi; \
+		sonar-scanner \
+			-Dsonar.projectKey=keiko-backend \
+			-Dsonar.sources=. \
+			-Dsonar.host.url=http://localhost:9000 \
+			-Dsonar.token=$$SONAR_TOKEN; \
+		echo "$(GREEN)✅ SonarQube analysis completed$(RESET)"; \
+		echo "$(GREEN)📊 View results at: http://localhost:9000/dashboard?id=keiko-backend$(RESET)"; \
+	else \
+		echo "$(RED)❌ sonar-scanner not found$(RESET)"; \
+		echo "$(YELLOW)Please install SonarQube Scanner:$(RESET)"; \
+		echo "  - macOS: brew install sonar-scanner"; \
+		echo "  - Linux: Download from https://docs.sonarqube.org/latest/analysis/scan/sonarscanner/"; \
+		echo "  - Or use Docker: docker run --rm -v \$$(pwd):/usr/src sonarsource/sonar-scanner-cli"; \
+		exit 1; \
+	fi
+
+sonar-docker: sonar-generate-reports ## Run SonarQube analysis using Docker
+	@echo "$(BLUE)🐳 Running SonarQube analysis using Docker...$(RESET)"
+	@if [ -z "$$SONAR_TOKEN" ]; then \
+		echo "$(RED)❌ SONAR_TOKEN environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Please set SONAR_TOKEN with your SonarQube authentication token$(RESET)"; \
+		exit 1; \
+	fi
+	@docker run --rm \
+		-e SONAR_HOST_URL=http://host.docker.internal:9000 \
+		-e SONAR_TOKEN=$$SONAR_TOKEN \
+		-v $$(pwd):/usr/src \
+		sonarsource/sonar-scanner-cli:latest
+	@echo "$(GREEN)✅ SonarQube Docker analysis completed$(RESET)"
+	@echo "$(GREEN)📊 View results at: http://localhost:9000/dashboard?id=keiko-backend$(RESET)"
+
+sonar-cloud: sonar-generate-reports ## Run SonarCloud analysis
+	@echo "$(BLUE)☁️ Running SonarCloud analysis...$(RESET)"
+	@if [ -z "$$SONARCLOUD_TOKEN" ]; then \
+		echo "$(RED)❌ SONARCLOUD_TOKEN environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Please set SONARCLOUD_TOKEN with your SonarCloud token$(RESET)"; \
+		exit 1; \
+	fi
+	@if command -v sonar-scanner >/dev/null 2>&1; then \
+		sonar-scanner \
+			-Dsonar.projectKey=keiko-development_keiko-backend \
+			-Dsonar.organization=keiko-development \
+			-Dsonar.sources=. \
+			-Dsonar.host.url=https://sonarcloud.io \
+			-Dsonar.token=$$SONARCLOUD_TOKEN; \
+		echo "$(GREEN)✅ SonarCloud analysis completed$(RESET)"; \
+	else \
+		echo "$(RED)❌ sonar-scanner not found$(RESET)"; \
+		exit 1; \
+	fi
+
+sonar-clean: ## Clean SonarQube reports and cache
+	@echo "$(BLUE)🧹 Cleaning SonarQube reports and cache...$(RESET)"
+	rm -rf .scannerwork/
+	rm -rf sonar-reports/
+	rm -f coverage.xml
+	rm -f pytest-junit.xml
+	rm -f bandit-report.json
+	rm -f mypy-report.json
+	@echo "$(GREEN)✅ SonarQube cleanup completed$(RESET)"
+
+# =====================================================================
 # CI/CD
 # =====================================================================
 
@@ -827,3 +937,16 @@ ci-quality: ## Run quality checks for CI
 	$(RUFF) format --check .
 	$(MYPY) --ignore-missing-imports . || true
 	$(BANDIT) -r . -x tests/ || true
+
+ci-sonar: sonar-generate-reports ## Run SonarQube analysis for CI/CD
+	@echo "$(BLUE)🔍 Running SonarQube analysis for CI/CD...$(RESET)"
+	@if command -v sonar-scanner >/dev/null 2>&1; then \
+		sonar-scanner \
+			-Dsonar.projectKey=keiko-backend \
+			-Dsonar.sources=. \
+			-Dsonar.host.url=$${SONAR_HOST_URL:-http://localhost:9000} \
+			-Dsonar.token=$${SONAR_TOKEN} \
+			-Dsonar.qualitygate.wait=true; \
+	else \
+		echo "$(YELLOW)⚠️ sonar-scanner not available in CI$(RESET)"; \
+	fi

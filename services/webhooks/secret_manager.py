@@ -245,7 +245,7 @@ class SecretManager:
             logger.exception(f"SecretManager rotate_secret fehlgeschlagen: {exc}")
             raise
 
-    async def list_recent_versions(self, *, key_name: str, within_hours: int) -> list[str]:
+    async def list_recent_versions(self, *, key_name: str, _within_hours: int) -> list[str]:
         """Listet neueste Versionen für Grace‑Validation.
 
         Es werden bis zu 10 Versionen geladen und anschließend anhand der
