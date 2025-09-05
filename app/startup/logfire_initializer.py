@@ -302,8 +302,14 @@ class LogfireShutdownHandler:
         """Beendet das Observability-System."""
         try:
             from observability import LOGFIRE_INTEGRATION_AVAILABLE, stop_observability_system
+            from observability.logfire_integration import is_logfire_shutdown_completed
 
             if not LOGFIRE_INTEGRATION_AVAILABLE:
+                return
+
+            # Prüfe, ob Logfire bereits beendet wurde
+            if is_logfire_shutdown_completed():
+                logger.debug("✅ Logfire bereits beendet - überspringe Observability-System-Stop")
                 return
 
             await stop_observability_system()

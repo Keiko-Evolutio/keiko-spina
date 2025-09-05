@@ -1,5 +1,5 @@
 name: 'Setup Backend Environment'
-description: 'Sets up Python backend environment with dependencies and configuration'
+description: 'Sets up Python backend environment with uv for reproducible builds'
 branding:
   icon: 'settings'
   color: 'blue'
@@ -33,6 +33,10 @@ inputs:
     description: 'Extra packages to install (space-separated)'
     required: false
     default: ''
+  use-lockfile:
+    description: 'Use uv.lock for reproducible builds'
+    required: false
+    default: 'true'
 
 outputs:
   python-version:
@@ -51,13 +55,18 @@ runs:
     - name: 📥 Checkout Code
       uses: actions/checkout@v4
 
-    - name: 💾 Advanced Dependency Caching
+    - name: 🚀 Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+        enable-cache: true
+
+    - name: 💾 Advanced uv Dependency Caching
       uses: ./.github/actions/advanced-cache
       with:
         cache-type: dependencies
         cache-paths: |
-          ~/.cache/pip
-          ~/.local/lib/python${{ inputs.python-version }}/site-packages
+          ~/.cache/uv
           ${{ inputs.working-directory }}/.venv
         working-directory: ${{ inputs.working-directory }}
         cache-warming: true
@@ -68,73 +77,90 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
-        cache: 'pip'
+        cache: 'uv'
         cache-dependency-path: |
           ${{ inputs.working-directory }}/pyproject.toml
-          ${{ inputs.working-directory }}/requirements*.txt
+          ${{ inputs.working-directory }}/uv.lock
 
-    - name: 📦 Install Dependencies
+    - name: 📦 Install Dependencies with uv
       id: install-deps
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        echo "🔧 Installing Python dependencies..."
-        
-        # Upgrade pip first
-        python -m pip install --upgrade pip
-        
-        # Build dependency list based on inputs
-        deps_to_install=()
-        
-        # Base installation
-        if [ -f "pyproject.toml" ]; then
-          echo "📋 Found pyproject.toml, installing package..."
+        echo "🔧 Installing Python dependencies with uv..."
+
+        # Check if uv.lock exists for reproducible builds
+        if [ "${{ inputs.use-lockfile }}" = "true" ] && [ -f "uv.lock" ]; then
+          echo "🔒 Found uv.lock - using for reproducible builds"
+
+          # Use uv dependency-groups for consistent CI builds
           if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ "${{ inputs.install-test-deps }}" = "true" ]; then
-            deps_to_install+=("-e .[dev,test]")
+            echo "🚀 Installing dev and test dependency groups with lockfile"
+            uv sync --group dev --group test --frozen
           elif [ "${{ inputs.install-dev-deps }}" = "true" ]; then
-            deps_to_install+=("-e .[dev]")
+            echo "🚀 Installing dev dependency group with lockfile"
+            uv sync --group dev --frozen
           elif [ "${{ inputs.install-test-deps }}" = "true" ]; then
-            deps_to_install+=("-e .[test]")
+            echo "🚀 Installing test dependency group with lockfile"
+            uv sync --group test --frozen
           else
-            deps_to_install+=("-e .")
+            echo "🚀 Installing runtime dependencies only with lockfile"
+            uv sync --frozen
           fi
-        elif [ -f "requirements.txt" ]; then
-          echo "📋 Found requirements.txt, installing..."
-          deps_to_install+=("-r requirements.txt")
-          
-          if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ -f "requirements-dev.txt" ]; then
-            deps_to_install+=("-r requirements-dev.txt")
-          fi
-          
-          if [ "${{ inputs.install-test-deps }}" = "true" ] && [ -f "requirements-test.txt" ]; then
-            deps_to_install+=("-r requirements-test.txt")
-          fi
+
         else
-          echo "⚠️ No pyproject.toml or requirements.txt found"
+          echo "⚠️ No uv.lock found or lockfile disabled - installing without lock"
+
+          # Fallback to pip installation for compatibility
+          python -m pip install --upgrade pip
+
+          # Build dependency list based on inputs
+          deps_to_install=()
+
+          if [ -f "pyproject.toml" ]; then
+            echo "📋 Found pyproject.toml, installing package..."
+            if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ "${{ inputs.install-test-deps }}" = "true" ]; then
+              deps_to_install+=("-e .[dev,test]")
+            elif [ "${{ inputs.install-dev-deps }}" = "true" ]; then
+              deps_to_install+=("-e .[dev]")
+            elif [ "${{ inputs.install-test-deps }}" = "true" ]; then
+              deps_to_install+=("-e .[test]")
+            else
+              deps_to_install+=("-e .")
+            fi
+          fi
+
+          # Install dependencies
+          if [ ${#deps_to_install[@]} -gt 0 ]; then
+            echo "🚀 Installing: ${deps_to_install[*]}"
+            python -m pip install "${deps_to_install[@]}"
+          fi
         fi
-        
-        # Add extra packages if specified
+
+        # Install extra packages if specified
         if [ -n "${{ inputs.extra-packages }}" ]; then
           echo "📦 Installing extra packages: ${{ inputs.extra-packages }}"
           for package in ${{ inputs.extra-packages }}; do
-            deps_to_install+=("$package")
+            if command -v uv >/dev/null 2>&1; then
+              uv add "$package" --dev || python -m pip install "$package"
+            else
+              python -m pip install "$package"
+            fi
           done
         fi
-        
-        # Install all dependencies
-        if [ ${#deps_to_install[@]} -gt 0 ]; then
-          echo "🚀 Installing: ${deps_to_install[*]}"
-          pip install "${deps_to_install[@]}"
-        fi
-        
+
         # Output installed packages for verification
         echo "📋 Installed packages:"
-        pip list --format=freeze > installed-packages.txt
-        cat installed-packages.txt
-        
-        # Set output
-        echo "dependencies=$(pip list --format=freeze | wc -l)" >> $GITHUB_OUTPUT
-        
+        if command -v uv >/dev/null 2>&1; then
+          uv pip list > installed-packages.txt
+          cat installed-packages.txt
+          echo "dependencies=$(uv pip list | wc -l)" >> $GITHUB_OUTPUT
+        else
+          pip list --format=freeze > installed-packages.txt
+          cat installed-packages.txt
+          echo "dependencies=$(pip list --format=freeze | wc -l)" >> $GITHUB_OUTPUT
+        fi
+
         echo "✅ Dependencies installation completed"
 
     - name: 🔧 Setup Environment File

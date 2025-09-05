@@ -199,6 +199,11 @@ class LogfireManager:
         Returns:
             bool: True wenn erfolgreich initialisiert
         """
+        # Verhindere mehrfache Initialisierung
+        if self._initialized:
+            logger.debug("Logfire bereits initialisiert - überspringe")
+            return True
+
         start_time = time.time()
 
         try:
@@ -268,7 +273,17 @@ class LogfireManager:
         if self.settings.console_enabled:
             config_kwargs["console"] = {}
 
-        logfire.configure(**config_kwargs)
+        try:
+            logfire.configure(**config_kwargs)
+        except Exception as e:
+            # Behandle bekannte Konfigurationsfehler
+            error_msg = str(e).lower()
+            if "shutdown can only be called once" in error_msg:
+                logger.debug("⚠️ Logfire bereits konfiguriert (shutdown-Fehler erwartet)")
+            elif "already instrumented" in error_msg:
+                logger.debug("⚠️ Logfire bereits instrumentiert")
+            else:
+                raise  # Unbekannte Fehler weiterwerfen
 
     def _setup_instrumentations(self) -> None:
         """Aktiviert alle konfigurierten Instrumentierungen."""
@@ -290,17 +305,31 @@ class LogfireManager:
 
         for name, (enabled, instrument_func) in simple_instrumentations.items():
             if enabled:
+                # Prüfe, ob bereits instrumentiert
+                if self._instrumentation_status.get(name, False):
+                    logger.debug(f"⚠️ {name.title()}-Instrumentierung bereits aktiv - überspringe")
+                    continue
+
                 try:
                     instrument_func()
                     self._instrumentation_status[name] = True
                     logger.debug(f"✅ {name.title()}-Instrumentierung aktiviert")
                 except Exception as e:
-                    self._instrumentation_status[name] = False
-                    logger.warning(f"⚠️ {name.title()}-Instrumentierung fehlgeschlagen: {e}")
+                    error_msg = str(e).lower()
+                    if "already instrumented" in error_msg:
+                        self._instrumentation_status[name] = True
+                        logger.debug(f"⚠️ {name.title()}-Instrumentierung bereits aktiv")
+                    else:
+                        self._instrumentation_status[name] = False
+                        logger.warning(f"⚠️ {name.title()}-Instrumentierung fehlgeschlagen: {e}")
 
     def _instrument_openai(self) -> None:
         """Instrumentiert OpenAI API-Calls."""
-        logfire.instrument_openai()
+        try:
+            logfire.instrument_openai()
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_anthropic(self) -> None:
         """Instrumentiert Anthropic API-Calls."""
@@ -309,14 +338,25 @@ class LogfireManager:
             logfire.instrument_anthropic()
         except ImportError:
             raise ImportError("Anthropic package nicht installiert. Installieren Sie mit: pip install anthropic")
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_httpx(self) -> None:
         """Instrumentiert HTTPX HTTP-Client."""
-        logfire.instrument_httpx()
+        try:
+            logfire.instrument_httpx()
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_requests(self) -> None:
         """Instrumentiert Requests HTTP-Client."""
-        logfire.instrument_requests()
+        try:
+            logfire.instrument_requests()
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_sqlalchemy(self) -> None:
         """Instrumentiert SQLAlchemy Database-Queries."""
@@ -325,10 +365,17 @@ class LogfireManager:
             logfire.instrument_sqlalchemy()
         except ImportError:
             raise ImportError("SQLAlchemy package nicht installiert. Installieren Sie mit: pip install 'logfire[sqlalchemy]'")
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_pydantic(self) -> None:
         """Instrumentiert Pydantic Validierung."""
-        logfire.instrument_pydantic()
+        try:
+            logfire.instrument_pydantic()
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def _instrument_system_metrics(self) -> None:
         """Instrumentiert System-Metriken (CPU, Memory, Disk)."""
@@ -338,17 +385,30 @@ class LogfireManager:
             logfire.instrument_system_metrics()
         except ImportError:
             raise ImportError("System-Metrics package nicht installiert. Installieren Sie mit: pip install 'logfire[system-metrics]'")
+        except Exception as e:
+            if "already instrumented" not in str(e).lower():
+                raise
 
     def instrument_fastapi_app(self, app) -> None:
         """Instrumentiert FastAPI-Anwendung (benötigt app-Parameter)."""
         if self.settings.instrument_fastapi and self.is_available():
+            # Prüfe, ob bereits instrumentiert
+            if self._instrumentation_status.get("fastapi", False):
+                logger.debug("⚠️ FastAPI-Instrumentierung bereits aktiv - überspringe")
+                return
+
             try:
                 logfire.instrument_fastapi(app)
                 self._instrumentation_status["fastapi"] = True
                 logger.debug("✅ FastAPI-Instrumentierung aktiviert")
             except Exception as e:
-                self._instrumentation_status["fastapi"] = False
-                logger.warning(f"⚠️ FastAPI-Instrumentierung fehlgeschlagen: {e}")
+                error_msg = str(e).lower()
+                if "already instrumented" in error_msg:
+                    self._instrumentation_status["fastapi"] = True
+                    logger.debug("⚠️ FastAPI-Instrumentierung bereits aktiv")
+                else:
+                    self._instrumentation_status["fastapi"] = False
+                    logger.warning(f"⚠️ FastAPI-Instrumentierung fehlgeschlagen: {e}")
 
     def _activate_fallback(self) -> bool:
         """Aktiviert Fallback-Modus."""
@@ -443,6 +503,8 @@ class LogfireManager:
 
 # Globaler Manager (Singleton)
 _logfire_manager: LogfireManager | None = None
+_shutdown_in_progress: bool = False
+_shutdown_completed: bool = False
 
 
 def get_logfire_manager() -> LogfireManager:
@@ -463,13 +525,68 @@ def initialize_logfire(settings: LogfireSettings | None = None) -> bool:
         bool: True wenn erfolgreich initialisiert
     """
     global _logfire_manager
+
+    # Prüfe, ob bereits initialisiert
+    if _logfire_manager and _logfire_manager._initialized:
+        logger.debug("Logfire bereits global initialisiert - überspringe")
+        return True
+
     _logfire_manager = LogfireManager(settings)
     return _logfire_manager.initialize()
 
 
 def shutdown_logfire() -> None:
-    """Beendet die Logfire-Integration."""
-    global _logfire_manager
-    if _logfire_manager:
-        logger.info("Logfire-Integration beendet")
+    """Beendet die Logfire-Integration und OpenTelemetry MeterProvider gracefully."""
+    global _logfire_manager, _shutdown_in_progress, _shutdown_completed
+
+    # Verhindere mehrfache Shutdown-Aufrufe
+    if _shutdown_in_progress or _shutdown_completed:
+        logger.debug("⚠️ Logfire shutdown bereits in Bearbeitung oder abgeschlossen - überspringe")
+        return
+
+    if not _logfire_manager:
+        _shutdown_completed = True
+        return
+
+    _shutdown_in_progress = True
+
+    try:
+        # Proper Logfire shutdown with provider cleanup
+        if LOGFIRE_AVAILABLE and hasattr(logfire, 'shutdown'):
+            try:
+                logfire.shutdown()
+                logger.debug("✅ Logfire SDK shutdown erfolgreich")
+            except Exception as e:
+                # Spezielle Behandlung für bekannte Shutdown-Fehler
+                error_msg = str(e).lower()
+                if "shutdown can only be called once" in error_msg:
+                    logger.debug("⚠️ Logfire SDK bereits beendet (erwartet bei mehrfachem Aufruf)")
+                elif "deadline already exceeded" in error_msg:
+                    logger.debug("⚠️ Logfire SDK shutdown deadline exceeded (erwartet)")
+                elif "meterprovider.shutdown failed" in error_msg:
+                    logger.debug("⚠️ Logfire MeterProvider shutdown fehlgeschlagen (erwartet)")
+                else:
+                    logger.debug(f"⚠️ Logfire SDK shutdown fehlgeschlagen: {e}")
+
+        # Clean up our manager reference
         _logfire_manager = None
+        logger.info("✅ Logfire-Integration beendet")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Fehler beim Logfire shutdown: {e}")
+        _logfire_manager = None
+    finally:
+        _shutdown_completed = True
+        _shutdown_in_progress = False
+
+
+def is_logfire_shutdown_completed() -> bool:
+    """Prüft, ob der Logfire-Shutdown bereits abgeschlossen ist."""
+    return _shutdown_completed
+
+
+def reset_logfire_shutdown_state() -> None:
+    """Setzt den Shutdown-Status zurück (nur für Tests)."""
+    global _shutdown_in_progress, _shutdown_completed
+    _shutdown_in_progress = False
+    _shutdown_completed = False

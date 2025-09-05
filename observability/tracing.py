@@ -109,6 +109,8 @@ _meter_provider: MeterProvider | None = None
 _tracer: Any | None = None
 _is_initialized: bool = False
 _initialization_in_progress: bool = False
+_shutdown_in_progress: bool = False
+_shutdown_completed: bool = False
 
 
 # ============================================================================
@@ -522,7 +524,12 @@ def init_tracing(config: ObservabilityConfig | None = None) -> None:
             metric_readers = []
             if cfg.otlp_endpoint:
                 metric_exporter = OTLPMetricExporter(endpoint=cfg.otlp_endpoint)
-                metric_readers = [PeriodicExportingMetricReader(metric_exporter)]
+                # Shorter export interval to prevent deadline exceeded errors
+                metric_readers = [PeriodicExportingMetricReader(
+                    exporter=metric_exporter,
+                    export_interval_millis=5000,  # 5 seconds instead of default 60
+                    export_timeout_millis=2000    # 2 seconds timeout
+                )]
 
             _meter_provider = MeterProvider(resource=resource, metric_readers=metric_readers)
             metrics.set_meter_provider(_meter_provider)
@@ -631,34 +638,86 @@ def record_exception_in_span(exception: Exception, span_name: str | None = None,
 
 async def shutdown_tracing() -> None:
     """Beendet Tracing sauber, inklusive Logfire-Integration."""
-    global _tracer_provider, _meter_provider, _is_initialized
+    global _tracer_provider, _meter_provider, _is_initialized, _shutdown_in_progress, _shutdown_completed
 
-    # Logfire-Integration beenden (falls verfügbar)
-    if LOGFIRE_INTEGRATION_AVAILABLE:
-        try:
-            shutdown_logfire()
-            logger.info("✅ Logfire-Integration beendet")
-        except Exception as e:
-            logger.warning(f"⚠️ Fehler beim Beenden von Logfire: {e}")
-
-    if not OPENTELEMETRY_AVAILABLE or not _is_initialized:
+    # Prevent multiple shutdown attempts
+    if _shutdown_in_progress or _shutdown_completed:
+        logger.debug("⚠️ Shutdown bereits in Bearbeitung oder abgeschlossen - überspringe")
         return
 
+    _shutdown_in_progress = True
+
     try:
-        if _tracer_provider:
-            _tracer_provider.shutdown()
-        if _meter_provider:
-            _meter_provider.shutdown()
+        # Logfire-Integration beenden (falls verfügbar)
+        if LOGFIRE_INTEGRATION_AVAILABLE and shutdown_logfire:
+            try:
+                shutdown_logfire()
+                logger.debug("✅ Logfire-Integration von Tracing beendet")
+            except Exception as e:
+                logger.debug(f"⚠️ Fehler beim Beenden von Logfire (erwartet bei mehrfachem Aufruf): {e}")
 
-        _tracer_provider = None
-        _meter_provider = None
-        _is_initialized = False
+        if not OPENTELEMETRY_AVAILABLE or not _is_initialized:
+            return
 
-        logger.info("✅ Tracing erfolgreich beendet")
-    except (AttributeError, TypeError) as e:
-        logger.warning(f"❌ Fehler beim Tracing-Shutdown - Attribut-/Typ-Fehler: {e}")
-    except Exception as e:
-        logger.exception(f"❌ Fehler beim Tracing-Shutdown - Unerwarteter Fehler: {e}")
+        try:
+            # Shutdown MeterProvider first with timeout protection
+            if _meter_provider and hasattr(_meter_provider, 'shutdown'):
+                try:
+                    import asyncio
+                    # Use asyncio timeout to prevent hanging
+                    await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, _meter_provider.shutdown
+                        ),
+                        timeout=2.0  # Reduziertes Timeout
+                    )
+                    logger.debug("✅ MeterProvider shutdown erfolgreich")
+                except asyncio.TimeoutError:
+                    logger.debug("⚠️ MeterProvider shutdown timeout - forciere shutdown (erwartet)")
+                except Exception as meter_e:
+                    # Spezielle Behandlung für "deadline already exceeded" Fehler
+                    if "deadline already exceeded" in str(meter_e).lower():
+                        logger.debug("⚠️ MeterProvider shutdown deadline exceeded (erwartet bei mehrfachem Aufruf)")
+                    elif "shutdown can only be called once" in str(meter_e).lower():
+                        logger.debug("⚠️ MeterProvider bereits beendet (erwartet bei mehrfachem Aufruf)")
+                    else:
+                        logger.warning(f"⚠️ MeterProvider shutdown fehlgeschlagen: {meter_e}")
+            
+            # Then shutdown TracerProvider
+            if _tracer_provider and hasattr(_tracer_provider, 'shutdown'):
+                try:
+                    await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, _tracer_provider.shutdown
+                        ),
+                        timeout=1.5  # Reduziertes Timeout
+                    )
+                    logger.debug("✅ TracerProvider shutdown erfolgreich")
+                except asyncio.TimeoutError:
+                    logger.debug("⚠️ TracerProvider shutdown timeout - forciere shutdown (erwartet)")
+                except Exception as tracer_e:
+                    # Spezielle Behandlung für bekannte Shutdown-Fehler
+                    if "deadline already exceeded" in str(tracer_e).lower():
+                        logger.debug("⚠️ TracerProvider shutdown deadline exceeded (erwartet bei mehrfachem Aufruf)")
+                    elif "shutdown can only be called once" in str(tracer_e).lower():
+                        logger.debug("⚠️ TracerProvider bereits beendet (erwartet bei mehrfachem Aufruf)")
+                    else:
+                        logger.warning(f"⚠️ TracerProvider shutdown fehlgeschlagen: {tracer_e}")
+
+            # Clean up references
+            _tracer_provider = None
+            _meter_provider = None
+            _is_initialized = False
+
+            logger.info("✅ Tracing erfolgreich beendet")
+        except (AttributeError, TypeError) as e:
+            logger.warning(f"❌ Fehler beim Tracing-Shutdown - Attribut-/Typ-Fehler: {e}")
+        except Exception as e:
+            logger.exception(f"❌ Fehler beim Tracing-Shutdown - Unerwarteter Fehler: {e}")
+            
+    finally:
+        _shutdown_completed = True
+        _shutdown_in_progress = False
 
 
 # ============================================================================

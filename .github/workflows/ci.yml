@@ -75,35 +75,40 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
+      - name: 🚀 Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          cache: "pip"
+          cache: "uv"
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          uv sync --group dev --frozen
 
       - name: 🧹 Run Ruff Linting
         if: matrix.check == 'ruff-lint'
         run: |
           cd backend
-          ruff check . --output-format=github
+          uv run ruff check . --output-format=github
 
       - name: 🎨 Run Ruff Formatting
         if: matrix.check == 'ruff-format'
         run: |
           cd backend
-          ruff format --check .
+          uv run ruff format --check .
 
-      - name: 🔍 Run MyPy Type Checking
+      - name: 🔍 Run MyPy Type Checking (Enterprise-Grade)
         if: matrix.check == 'mypy'
         run: |
           cd backend
-          mypy . --show-error-codes --pretty
+          uv run mypy . --show-error-codes --pretty --color-output
 
 
 
@@ -469,17 +474,22 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
+      - name: 🚀 Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          cache: "pip"
+          cache: "uv"
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          uv sync --group dev --frozen
 
       - name: 📋 Validate OpenAPI Specification
         run: |
@@ -559,22 +569,27 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
+      - name: 🚀 Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          cache: "pip"
+          cache: "uv"
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          uv sync --group dev --frozen
 
       - name: 🔌 Run MCP Conformance Tests
         run: |
           cd backend
-          pytest tests/ \
+          uv run pytest tests/ \
             -v \
             --tb=short \
             -m "mcp" \
@@ -615,17 +630,22 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
+      - name: 🚀 Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          cache: "pip"
+          cache: "uv"
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          pip install --upgrade pip
-          pip install -e ".[dev,test]"
+          uv sync --group dev --group test --frozen
 
       - name: 🔧 Setup Test Environment
         run: |
@@ -708,11 +728,16 @@ jobs:
           python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
           cache: "pip"
 
-      - name: 📦 Install Dependencies
+      - name: 🚀 Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          pip install --upgrade pip
-          pip install -e ".[dev,test]"
+          make install-ci
 
       - name: 📋 Run Conformance Tests
         run: |
