@@ -17,3 +17,12 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Run tests and generate coverage report
+        run: |
+          pytest --junitxml=pytest-junit.xml --cov=your_package --cov-report=xml
+      - name: Run Bandit security checks
+        run: |
+          bandit -r your_package -f json -o bandit-report.json
+      - name: Run Mypy static type checks
+        run: |
+          mypy your_package --show-error-codes --no-error-summary --junit-xml-report=mypy-report.json
