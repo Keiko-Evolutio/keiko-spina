@@ -93,18 +93,18 @@ runs:
         if [ "${{ inputs.use-lockfile }}" = "true" ] && [ -f "uv.lock" ]; then
           echo "🔒 Found uv.lock - using for reproducible builds"
 
-          # Use Makefile targets for consistent CI builds
+          # Use uv dependency-groups for consistent CI builds
           if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ "${{ inputs.install-test-deps }}" = "true" ]; then
-            echo "🚀 Installing dev and test dependencies with lockfile"
-            make install-ci
+            echo "🚀 Installing dev and test dependency groups with lockfile"
+            uv sync --group dev --group test --frozen
           elif [ "${{ inputs.install-dev-deps }}" = "true" ]; then
-            echo "🚀 Installing dev dependencies with lockfile"
-            make install-ci-dev
+            echo "🚀 Installing dev dependency group with lockfile"
+            uv sync --group dev --frozen
           elif [ "${{ inputs.install-test-deps }}" = "true" ]; then
-            echo "🚀 Installing test dependencies with lockfile"
-            make install-ci-test
+            echo "🚀 Installing test dependency group with lockfile"
+            uv sync --group test --frozen
           else
-            echo "🚀 Installing base dependencies with lockfile"
+            echo "🚀 Installing runtime dependencies only with lockfile"
             uv sync --frozen
           fi
 

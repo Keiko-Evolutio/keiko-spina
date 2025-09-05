@@ -90,7 +90,7 @@ jobs:
       - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          make install-ci-dev
+          uv sync --group dev --frozen
 
       - name: 🧹 Run Ruff Linting
         if: matrix.check == 'ruff-lint'
@@ -489,7 +489,7 @@ jobs:
       - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          make install-ci-dev
+          uv sync --group dev --frozen
 
       - name: 📋 Validate OpenAPI Specification
         run: |
@@ -584,7 +584,7 @@ jobs:
       - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          make install-ci-dev
+          uv sync --group dev --frozen
 
       - name: 🔌 Run MCP Conformance Tests
         run: |
@@ -645,7 +645,7 @@ jobs:
       - name: 📦 Install Dependencies with uv
         run: |
           cd backend
-          make install-ci
+          uv sync --group dev --group test --frozen
 
       - name: 🔧 Setup Test Environment
         run: |

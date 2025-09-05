@@ -24,7 +24,7 @@ RUN useradd --create-home --shell /bin/bash app \
 # Copy dependency files
 COPY --chown=app:app pyproject.toml uv.lock ./
 
-# Install dependencies with lockfile for reproducible builds
+# Install only runtime dependencies with lockfile for reproducible builds
 RUN uv sync --frozen
 
 # Production stage

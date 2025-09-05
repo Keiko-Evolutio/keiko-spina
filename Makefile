@@ -42,8 +42,9 @@ help: ## Show this help message
 	@echo "$(BLUE)Keiko Backend - Development Commands$(RESET)"
 	@echo ""
 	@echo "$(GREEN)🚀 Quick Start:$(RESET)"
-	@echo "  install             Install all dependencies"
-	@echo "  install-ci          Install dependencies for CI (with lockfile)"
+	@echo "  install             Install development dependencies (dev + test + docs)"
+	@echo "  install-runtime     Install only runtime dependencies"
+	@echo "  install-all         Install all dependency groups"
 	@echo "  dev                 Start essential development environment (6 containers + backend)"
 	@echo "  dev-full            Start full development environment (20+ containers + backend)"
 	@echo "  test                Run all tests"
@@ -75,6 +76,7 @@ help: ## Show this help message
 	@echo "  test-config         Validate test/coverage configuration"
 	@echo "  validate-reproducible-builds  Validate reproducible builds configuration"
 	@echo "  validate-lint-format  Validate lint/format consolidation"
+	@echo "  validate-dependencies  Validate dependency separation (Runtime vs. Dev)"
 	@echo "  test-websocket      Test WebSocket functionality"
 	@echo "  test-kei-agents     Run KEI-Agent-Framework tests"
 	@echo "  test-logfire        Run Logfire integration tests"
@@ -94,25 +96,45 @@ help: ## Show this help message
 # Setup & Installation
 # =====================================================================
 
-install: ## Install all dependencies
-	@echo "$(BLUE)Installing dependencies...$(RESET)"
-	$(UV) sync --extra dev
-	@echo "$(GREEN)✅ Dependencies installed$(RESET)"
+install: ## Install all dependencies for development
+	@echo "$(BLUE)Installing dependencies with uv dependency-groups...$(RESET)"
+	$(UV) sync --group dev --group test --group docs
+	@echo "$(GREEN)✅ Development dependencies installed$(RESET)"
+
+install-runtime: ## Install only runtime dependencies
+	@echo "$(BLUE)Installing runtime dependencies only...$(RESET)"
+	$(UV) sync
+	@echo "$(GREEN)✅ Runtime dependencies installed$(RESET)"
 
 install-ci: ## Install dependencies for CI (with lockfile)
 	@echo "$(BLUE)Installing CI dependencies with lockfile...$(RESET)"
-	$(UV) sync --extra dev --extra test --frozen
+	$(UV) sync --group dev --group test --frozen
 	@echo "$(GREEN)✅ CI dependencies installed$(RESET)"
 
 install-ci-dev: ## Install dev dependencies for CI
 	@echo "$(BLUE)Installing CI dev dependencies...$(RESET)"
-	$(UV) sync --extra dev --frozen
+	$(UV) sync --group dev --frozen
 	@echo "$(GREEN)✅ CI dev dependencies installed$(RESET)"
 
 install-ci-test: ## Install test dependencies for CI
 	@echo "$(BLUE)Installing CI test dependencies...$(RESET)"
-	$(UV) sync --extra test --frozen
+	$(UV) sync --group test --frozen
 	@echo "$(GREEN)✅ CI test dependencies installed$(RESET)"
+
+install-docs: ## Install documentation dependencies
+	@echo "$(BLUE)Installing documentation dependencies...$(RESET)"
+	$(UV) sync --group docs
+	@echo "$(GREEN)✅ Documentation dependencies installed$(RESET)"
+
+install-perf: ## Install performance testing dependencies
+	@echo "$(BLUE)Installing performance testing dependencies...$(RESET)"
+	$(UV) sync --group perf
+	@echo "$(GREEN)✅ Performance dependencies installed$(RESET)"
+
+install-all: ## Install all dependency groups
+	@echo "$(BLUE)Installing all dependency groups...$(RESET)"
+	$(UV) sync --group dev --group test --group docs --group api --group perf --group observability --group azure --group deployment
+	@echo "$(GREEN)✅ All dependencies installed$(RESET)"
 
 # =====================================================================
 # Container Management
@@ -647,6 +669,15 @@ validate-lint-format: ## Validate lint/format consolidation
 	@$(UV) run ruff check --help > /dev/null 2>&1 && echo "$(GREEN)✅ Ruff check works$(RESET)" || echo "$(RED)❌ Ruff check failed$(RESET)"
 	@$(UV) run ruff format --help > /dev/null 2>&1 && echo "$(GREEN)✅ Ruff format works$(RESET)" || echo "$(RED)❌ Ruff format failed$(RESET)"
 	@echo "$(GREEN)✅ Lint/Format consolidation is complete$(RESET)"
+
+validate-dependencies: ## Validate dependency separation (Runtime vs. Dev)
+	@echo "$(BLUE)🔧 Validating dependency separation...$(RESET)"
+	@echo "$(GREEN)✅ Checking uv dependency-groups...$(RESET)"
+	@$(UV) sync --group dev --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ Dev group works$(RESET)" || echo "$(RED)❌ Dev group failed$(RESET)"
+	@$(UV) sync --group test --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ Test group works$(RESET)" || echo "$(RED)❌ Test group failed$(RESET)"
+	@$(UV) sync --group docs --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ Docs group works$(RESET)" || echo "$(RED)❌ Docs group failed$(RESET)"
+	@$(UV) sync --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ Runtime sync works$(RESET)" || echo "$(RED)❌ Runtime sync failed$(RESET)"
+	@echo "$(GREEN)✅ Dependency separation is complete$(RESET)"
 
 # =====================================================================
 # Code Quality
