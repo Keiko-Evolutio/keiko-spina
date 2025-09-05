@@ -1,0 +1,21 @@
+groups:
+  - name: keiko.webhook
+    interval: 30s
+    rules:
+      - alert: WebhookDeliveryFailures
+        expr: increase(webhook_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook Zustellfehler hoch"
+          description: "Mehr als 10 Fehler in 5m"
+
+      - alert: WebhookDLQOverflow
+        expr: increase(webhook_dlq_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DLQ Einträge vorhanden"
+          description: "Es befinden sich fehlgeschlagene Zustellungen in der DLQ"

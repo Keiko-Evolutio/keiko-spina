@@ -1,0 +1,20 @@
+tenants:
+- api_keys:
+  - default-api-key
+  enabled: true
+  features:
+  - kei_stream
+  - tools
+  - monitoring
+  tenant_id: default
+  tier: basic
+- api_keys:
+  - premium-demo-key
+  enabled: true
+  features:
+  - kei_stream
+  - tools
+  - monitoring
+  - analytics
+  tenant_id: premium-demo
+  tier: premium

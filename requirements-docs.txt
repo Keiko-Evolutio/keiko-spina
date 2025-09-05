@@ -1,0 +1,22 @@
+# MkDocs und Plugins für Keiko Personal Assistant Dokumentation
+
+# Basis MkDocs
+mkdocs>=1.5.3
+mkdocs-material>=9.4.0
+
+# Plugins für erweiterte Funktionalität
+mkdocs-git-revision-date-localized-plugin>=1.2.0
+mkdocs-git-authors-plugin>=0.7.2
+mkdocs-minify-plugin>=0.7.1
+mkdocs-awesome-pages-plugin>=2.9.2
+mkdocs-macros-plugin>=1.0.5
+mkdocs-include-markdown-plugin>=6.0.4
+mkdocs-mermaid2-plugin>=1.1.1
+mkdocstrings[python]>=0.24.0
+
+# Markdown-Erweiterungen
+pymdown-extensions>=10.3.1
+
+# Zusätzliche Abhängigkeiten
+Pillow>=10.0.0  # Für Bildverarbeitung
+cairosvg>=2.7.1  # Für SVG-Unterstützung

@@ -1,0 +1,39 @@
+groups:
+  - name: keiko.cache
+    interval: 30s
+    rules:
+      - alert: CacheHitRatioLowWarning
+        expr: avg_over_time(keiko_cache_hit_ratio[5m]) < 0.7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache Hit Ratio niedrig"
+          description: "Hit Ratio unter 70% in den letzten 5 Minuten"
+
+      - alert: CacheHitRatioLowCritical
+        expr: avg_over_time(keiko_cache_hit_ratio[5m]) < 0.5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cache Hit Ratio kritisch"
+          description: "Hit Ratio unter 50% in den letzten 5 Minuten"
+
+      - alert: CacheEvictionsHigh
+        expr: rate(keiko_cache_eviction_total[1m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hohe Cache Eviction Rate"
+          description: "Evictions > 100/min"
+
+      - alert: DeduplicationDrop
+        expr: rate(keiko_request_deduplication_total{status="deduplicated"}[5m]) < rate(keiko_request_deduplication_total{status="processed"}[5m]) * 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deduplication Rate ungewöhnlich niedrig"
+          description: "Dedup Rate < 10% der verarbeiteten Requests"

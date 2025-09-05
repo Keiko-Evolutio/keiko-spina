@@ -1,0 +1,15 @@
+{
+  "name": "task_decomposition",
+  "version": "1.0.0",
+  "template": "Based on the task analysis and available agents, decompose the task into executable subtasks:\n\nTask Analysis:\n- Complexity: {{ complexity_score }}/10\n- Required Capabilities: {{ required_capabilities }}\n- Potential Subtasks: {{ potential_subtasks }}\n- Dependencies: {{ dependencies }}\n\nAvailable Agents and Capabilities:\n{{ agent_capabilities }}\n\nCreate an optimal decomposition that:\n1. Maximizes parallelization where possible\n2. Respects dependencies and constraints\n3. Assigns subtasks to most suitable agents\n4. Includes error handling and rollback steps\n5. Defines clear success criteria for each subtask\n\nProvide the decomposition as structured JSON with:\n- subtasks: List of executable subtasks\n- dependencies: Task dependency graph\n- agent_assignments: Recommended agent for each subtask\n- execution_order: Optimal execution sequence\n- rollback_plan: Compensation actions for failures",
+  "description": "Template für LLM-basierte Task-Dekomposition",
+  "variables": [
+    "complexity_score",
+    "required_capabilities",
+    "potential_subtasks",
+    "dependencies",
+    "agent_capabilities"
+  ],
+  "metadata": {},
+  "created_at": "2025-08-31T18:50:34.258560"
+}

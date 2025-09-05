@@ -1,0 +1,33 @@
+# Gitleaks Konfiguration für Secrets-Scanning
+
+title = "Keiko Gitleaks Config"
+
+[extend]
+path = ""
+
+[rules]
+
+  [rules.azure_key_vault]
+  id = "azure-key-vault-url"
+  description = "Azure Key Vault URL entdeckt"
+  regex = '''https:\/\/([a-zA-Z0-9-]+)\.vault\.azure\.net'''
+  entropy = 0.0
+
+  [rules.jwt_secret]
+  id = "jwt-secret"
+  description = "Möglicher JWT Secret"
+  regex = '''(?i)(jwt[_-]?secret|auth[_-]?secret)\s*[:=]\s*['\"][A-Za-z0-9-_\.]{16,}['\"]'''
+  entropy = 0.0
+
+  [rules.api_key]
+  id = "generic-api-key"
+  description = "Möglicher API Key"
+  regex = '''(?i)(api[_-]?key|x-api-key)\s*[:=]\s*['\"][A-Za-z0-9-_]{16,}['\"]'''
+  entropy = 0.0
+
+[allowlist]
+description = "Whitelist für Testdaten"
+paths = [
+  "tests/",
+  "backend/tests/",
+]

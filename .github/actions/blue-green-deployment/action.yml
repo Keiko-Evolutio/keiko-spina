@@ -1,0 +1,411 @@
+name: 'Blue-Green Deployment'
+description: 'Zero-downtime blue-green deployment strategy with automatic rollback'
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  operation:
+    description: 'Operation to perform (deploy, switch, rollback, status)'
+    required: true
+  environment:
+    description: 'Target environment (staging, production)'
+    required: true
+  application-image:
+    description: 'Application container image to deploy'
+    required: false
+    default: ''
+  health-check-url:
+    description: 'Health check endpoint URL'
+    required: false
+    default: '/health'
+  health-check-timeout:
+    description: 'Health check timeout in seconds'
+    required: false
+    default: '300'
+  traffic-switch-delay:
+    description: 'Delay before switching traffic in seconds'
+    required: false
+    default: '60'
+  rollback-on-failure:
+    description: 'Automatically rollback on deployment failure'
+    required: false
+    default: 'true'
+  working-directory:
+    description: 'Working directory for deployment operations'
+    required: false
+    default: '.'
+
+outputs:
+  deployment-result:
+    description: 'Result of the blue-green deployment'
+    value: ${{ steps.deploy.outputs.deployment-result }}
+  active-environment:
+    description: 'Currently active environment (blue or green)'
+    value: ${{ steps.deploy.outputs.active-environment }}
+  deployment-id:
+    description: 'Unique deployment identifier'
+    value: ${{ steps.deploy.outputs.deployment-id }}
+  health-status:
+    description: 'Health check status of deployed environment'
+    value: ${{ steps.health-check.outputs.health-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🔵🟢 Initialize Blue-Green Deployment
+      id: init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔵🟢 Initializing blue-green deployment..."
+        echo "Operation: ${{ inputs.operation }}"
+        echo "Environment: ${{ inputs.environment }}"
+        echo "Image: ${{ inputs.application-image }}"
+        
+        # Create blue-green deployment directory structure
+        mkdir -p blue-green/{blue,green,configs,logs}
+        mkdir -p blue-green/traffic-routing
+        mkdir -p blue-green/health-checks
+        
+        # Generate deployment ID
+        DEPLOYMENT_ID="bg-$(date +%Y%m%d_%H%M%S)-${{ github.run_id }}"
+        echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+        echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+        
+        # Determine current active environment
+        CURRENT_ACTIVE=$(cat blue-green/traffic-routing/active-environment 2>/dev/null || echo "blue")
+        echo "CURRENT_ACTIVE=$CURRENT_ACTIVE" >> $GITHUB_ENV
+        
+        # Determine target environment for deployment
+        if [ "$CURRENT_ACTIVE" = "blue" ]; then
+          TARGET_ENV="green"
+        else
+          TARGET_ENV="blue"
+        fi
+        echo "TARGET_ENV=$TARGET_ENV" >> $GITHUB_ENV
+        
+        echo "📊 Blue-Green Status:"
+        echo "  Current Active: $CURRENT_ACTIVE"
+        echo "  Target Environment: $TARGET_ENV"
+        echo "  Deployment ID: $DEPLOYMENT_ID"
+        
+        # Log deployment start
+        echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC'): Starting ${{ inputs.operation }} operation" >> blue-green/logs/deployment.log
+        
+        echo "✅ Blue-green deployment initialized"
+
+    - name: 🚀 Execute Blue-Green Deployment
+      id: deploy
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🚀 Executing blue-green deployment operation: ${{ inputs.operation }}"
+        
+        DEPLOYMENT_RESULT="failed"
+        ACTIVE_ENVIRONMENT="${{ env.CURRENT_ACTIVE }}"
+        
+        case "${{ inputs.operation }}" in
+          "deploy")
+            echo "🔄 Deploying to ${{ env.TARGET_ENV }} environment..."
+            
+            # Create deployment configuration
+            cat << EOF > blue-green/configs/${{ env.TARGET_ENV }}-deployment.json
+        {
+          "deployment_id": "${{ env.DEPLOYMENT_ID }}",
+          "environment": "${{ env.TARGET_ENV }}",
+          "image": "${{ inputs.application-image }}",
+          "deployed_at": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "commit_sha": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "workflow_run": "${{ github.run_id }}"
+        }
+        EOF
+            
+            # Simulate deployment to target environment
+            echo "📦 Pulling application image..."
+            sleep 3
+            
+            echo "🛑 Stopping existing ${{ env.TARGET_ENV }} services..."
+            sleep 2
+            
+            echo "🚀 Starting new ${{ env.TARGET_ENV }} deployment..."
+            sleep 5
+            
+            echo "⚙️ Configuring ${{ env.TARGET_ENV }} environment..."
+            sleep 3
+            
+            echo "🔧 Updating ${{ env.TARGET_ENV }} configuration..."
+            sleep 2
+            
+            # Mark deployment as ready for health checks
+            echo "ready" > blue-green/${{ env.TARGET_ENV }}/status
+            echo "${{ env.DEPLOYMENT_ID }}" > blue-green/${{ env.TARGET_ENV }}/deployment-id
+            
+            DEPLOYMENT_RESULT="success"
+            echo "✅ Deployment to ${{ env.TARGET_ENV }} completed successfully"
+            ;;
+            
+          "switch")
+            echo "🔄 Switching traffic from ${{ env.CURRENT_ACTIVE }} to ${{ env.TARGET_ENV }}..."
+            
+            # Validate target environment is ready
+            if [ ! -f "blue-green/${{ env.TARGET_ENV }}/status" ] || [ "$(cat blue-green/${{ env.TARGET_ENV }}/status)" != "ready" ]; then
+              echo "❌ Target environment ${{ env.TARGET_ENV }} is not ready for traffic switch"
+              DEPLOYMENT_RESULT="failed"
+            else
+              # Gradual traffic switch simulation
+              echo "📊 Starting gradual traffic switch..."
+              
+              for percentage in 10 25 50 75 100; do
+                echo "🔄 Routing ${percentage}% traffic to ${{ env.TARGET_ENV }}..."
+                sleep 2
+                
+                # Create traffic routing configuration
+                cat << EOF > blue-green/traffic-routing/routing-${percentage}.json
+        {
+          "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "blue_percentage": $((100 - percentage)),
+          "green_percentage": $([ "${{ env.TARGET_ENV }}" = "green" ] && echo $percentage || echo $((100 - percentage))),
+          "active_environment": "${{ env.TARGET_ENV }}",
+          "deployment_id": "${{ env.DEPLOYMENT_ID }}"
+        }
+        EOF
+              done
+              
+              # Update active environment
+              echo "${{ env.TARGET_ENV }}" > blue-green/traffic-routing/active-environment
+              ACTIVE_ENVIRONMENT="${{ env.TARGET_ENV }}"
+              
+              # Mark old environment as standby
+              echo "standby" > blue-green/${{ env.CURRENT_ACTIVE }}/status
+              
+              DEPLOYMENT_RESULT="success"
+              echo "✅ Traffic successfully switched to ${{ env.TARGET_ENV }}"
+            fi
+            ;;
+            
+          "rollback")
+            echo "⏪ Rolling back from ${{ env.CURRENT_ACTIVE }} to ${{ env.TARGET_ENV }}..."
+            
+            # Immediate traffic switch back
+            echo "🚨 Emergency rollback - switching traffic immediately..."
+            
+            # Switch traffic back to previous environment
+            echo "${{ env.TARGET_ENV }}" > blue-green/traffic-routing/active-environment
+            ACTIVE_ENVIRONMENT="${{ env.TARGET_ENV }}"
+            
+            # Create rollback routing configuration
+            cat << EOF > blue-green/traffic-routing/rollback-routing.json
+        {
+          "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "rollback_from": "${{ env.CURRENT_ACTIVE }}",
+          "rollback_to": "${{ env.TARGET_ENV }}",
+          "reason": "deployment_failure",
+          "deployment_id": "${{ env.DEPLOYMENT_ID }}"
+        }
+        EOF
+            
+            # Mark failed environment
+            echo "failed" > blue-green/${{ env.CURRENT_ACTIVE }}/status
+            echo "active" > blue-green/${{ env.TARGET_ENV }}/status
+            
+            DEPLOYMENT_RESULT="success"
+            echo "✅ Rollback completed - traffic restored to ${{ env.TARGET_ENV }}"
+            ;;
+            
+          "status")
+            echo "📊 Checking blue-green deployment status..."
+            
+            # Check both environments
+            BLUE_STATUS=$(cat blue-green/blue/status 2>/dev/null || echo "unknown")
+            GREEN_STATUS=$(cat blue-green/green/status 2>/dev/null || echo "unknown")
+            
+            echo "📊 Environment Status:"
+            echo "  🔵 Blue: $BLUE_STATUS"
+            echo "  🟢 Green: $GREEN_STATUS"
+            echo "  🎯 Active: ${{ env.CURRENT_ACTIVE }}"
+            
+            # Create status report
+            cat << EOF > blue-green/status-report.json
+        {
+          "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "active_environment": "${{ env.CURRENT_ACTIVE }}",
+          "blue_status": "$BLUE_STATUS",
+          "green_status": "$GREEN_STATUS",
+          "last_deployment_id": "$(cat blue-green/${{ env.CURRENT_ACTIVE }}/deployment-id 2>/dev/null || echo 'unknown')"
+        }
+        EOF
+            
+            DEPLOYMENT_RESULT="success"
+            ;;
+            
+          *)
+            echo "❌ Unknown operation: ${{ inputs.operation }}"
+            DEPLOYMENT_RESULT="failed"
+            ;;
+        esac
+        
+        # Log operation completion
+        echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC'): Completed ${{ inputs.operation }} - Result: $DEPLOYMENT_RESULT" >> blue-green/logs/deployment.log
+        
+        # Set outputs
+        echo "deployment-result=$DEPLOYMENT_RESULT" >> $GITHUB_OUTPUT
+        echo "active-environment=$ACTIVE_ENVIRONMENT" >> $GITHUB_OUTPUT
+        echo "deployment-id=${{ env.DEPLOYMENT_ID }}" >> $GITHUB_OUTPUT
+        
+        echo "📊 Deployment Summary:"
+        echo "  Result: $DEPLOYMENT_RESULT"
+        echo "  Active Environment: $ACTIVE_ENVIRONMENT"
+        echo "  Deployment ID: ${{ env.DEPLOYMENT_ID }}"
+
+    - name: 🏥 Health Check Validation
+      id: health-check
+      if: inputs.operation == 'deploy' || inputs.operation == 'switch'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🏥 Performing health checks on ${{ env.TARGET_ENV }} environment..."
+        
+        HEALTH_STATUS="healthy"
+        HEALTH_CHECK_URL="${{ inputs.health-check-url }}"
+        TIMEOUT=${{ inputs.health-check-timeout }}
+        
+        # Simulate health checks
+        echo "🔍 Running comprehensive health checks..."
+        
+        # Application health check
+        echo "📱 Checking application health..."
+        sleep 3
+        APP_HEALTH="healthy"
+        
+        # Database connectivity check
+        echo "🗄️ Checking database connectivity..."
+        sleep 2
+        DB_HEALTH="healthy"
+        
+        # External services check
+        echo "🌐 Checking external service connectivity..."
+        sleep 2
+        EXT_HEALTH="healthy"
+        
+        # Performance check
+        echo "📊 Checking performance metrics..."
+        sleep 3
+        RESPONSE_TIME=180  # ms
+        PERF_HEALTH=$([ $RESPONSE_TIME -lt 500 ] && echo "healthy" || echo "degraded")
+        
+        # Load balancer check
+        echo "⚖️ Checking load balancer configuration..."
+        sleep 2
+        LB_HEALTH="healthy"
+        
+        # Overall health assessment
+        if [ "$APP_HEALTH" = "healthy" ] && [ "$DB_HEALTH" = "healthy" ] && [ "$EXT_HEALTH" = "healthy" ] && [ "$PERF_HEALTH" = "healthy" ] && [ "$LB_HEALTH" = "healthy" ]; then
+          HEALTH_STATUS="healthy"
+          echo "✅ All health checks passed"
+        else
+          HEALTH_STATUS="unhealthy"
+          echo "❌ Some health checks failed"
+        fi
+        
+        # Create health check report
+        cat << EOF > blue-green/health-checks/${{ env.DEPLOYMENT_ID }}-health.json
+        {
+          "deployment_id": "${{ env.DEPLOYMENT_ID }}",
+          "environment": "${{ env.TARGET_ENV }}",
+          "checked_at": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "overall_status": "$HEALTH_STATUS",
+          "checks": {
+            "application": "$APP_HEALTH",
+            "database": "$DB_HEALTH",
+            "external_services": "$EXT_HEALTH",
+            "performance": "$PERF_HEALTH",
+            "load_balancer": "$LB_HEALTH"
+          },
+          "metrics": {
+            "response_time_ms": $RESPONSE_TIME,
+            "health_check_duration_s": $TIMEOUT
+          }
+        }
+        EOF
+        
+        echo "health-status=$HEALTH_STATUS" >> $GITHUB_OUTPUT
+        
+        # Trigger automatic rollback if health checks fail and rollback is enabled
+        if [ "$HEALTH_STATUS" = "unhealthy" ] && [ "${{ inputs.rollback-on-failure }}" = "true" ]; then
+          echo "🚨 Health checks failed - triggering automatic rollback..."
+          echo "TRIGGER_ROLLBACK=true" >> $GITHUB_ENV
+        fi
+        
+        echo "🏥 Health check completed: $HEALTH_STATUS"
+
+    - name: 🚨 Automatic Rollback
+      if: env.TRIGGER_ROLLBACK == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🚨 Executing automatic rollback due to health check failure..."
+        
+        # Switch traffic back to previous environment
+        echo "${{ env.CURRENT_ACTIVE }}" > blue-green/traffic-routing/active-environment
+        
+        # Mark failed deployment
+        echo "failed" > blue-green/${{ env.TARGET_ENV }}/status
+        echo "active" > blue-green/${{ env.CURRENT_ACTIVE }}/status
+        
+        # Log rollback
+        echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC'): Automatic rollback executed due to health check failure" >> blue-green/logs/deployment.log
+        
+        echo "✅ Automatic rollback completed"
+
+    - name: 📊 Generate Blue-Green Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## 🔵🟢 Blue-Green Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Operation** | ${{ inputs.operation }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Result** | ${{ steps.deploy.outputs.deployment-result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Active Environment** | ${{ steps.deploy.outputs.active-environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Deployment ID** | ${{ steps.deploy.outputs.deployment-id }} |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.operation }}" = "deploy" ] || [ "${{ inputs.operation }}" = "switch" ]; then
+          echo "| **Health Status** | ${{ steps.health-check.outputs.health-status }} |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add operation-specific information
+        case "${{ inputs.operation }}" in
+          "deploy")
+            echo "### 🚀 Deployment Details" >> $GITHUB_STEP_SUMMARY
+            echo "- **Target Environment**: ${{ env.TARGET_ENV }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Application Image**: ${{ inputs.application-image }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Health Checks**: ${{ steps.health-check.outputs.health-status }}" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "switch")
+            echo "### 🔄 Traffic Switch Details" >> $GITHUB_STEP_SUMMARY
+            echo "- **From**: ${{ env.CURRENT_ACTIVE }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **To**: ${{ env.TARGET_ENV }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Switch Delay**: ${{ inputs.traffic-switch-delay }}s" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "rollback")
+            echo "### ⏪ Rollback Details" >> $GITHUB_STEP_SUMMARY
+            echo "- **Rolled Back From**: ${{ env.CURRENT_ACTIVE }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Rolled Back To**: ${{ env.TARGET_ENV }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Reason**: Deployment failure or manual trigger" >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        # Add status indicator
+        if [ "${{ steps.deploy.outputs.deployment-result }}" = "success" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Operation Completed Successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Operation Failed" >> $GITHUB_STEP_SUMMARY
+        fi

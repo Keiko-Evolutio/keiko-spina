@@ -1,0 +1,373 @@
+# docker-compose.training.yml
+# Vollständige Schulungsumgebung für Keiko Personal Assistant
+# Alle ~20 Services für die komplette Schulung
+
+version: '3.8'
+
+services:
+  # === CORE SERVICES ===
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: keiko-postgres
+    environment:
+      POSTGRES_DB: keiko_dev
+      POSTGRES_USER: keiko_user
+      POSTGRES_PASSWORD: keiko_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keiko_user -d keiko_dev"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: keiko-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # NATS Message Broker
+  nats:
+    image: nats:2.10-alpine
+    container_name: keiko-nats
+    command: >
+      --jetstream
+      --store_dir=/data
+      --http_port=8222
+      --port=4222
+    volumes:
+      - nats-data:/data
+    ports:
+      - "4222:4222"   # NATS client connections
+      - "8222:8222"   # HTTP monitoring
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8222/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # === MONITORING SERVICES ===
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: keiko-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: keiko-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Jaeger Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.47
+    container_name: keiko-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger collector HTTP
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: keiko-alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.80.0
+    container_name: keiko-otel-collector
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8889:8889"   # Prometheus metrics
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    depends_on:
+      - jaeger
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8889/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # OpenTelemetry Health Check
+  otel-healthcheck:
+    image: curlimages/curl:8.1.2
+    container_name: keiko-otel-healthcheck
+    command: >
+      sh -c "
+        while true; do
+          curl -f http://otel-collector:8889/metrics > /dev/null 2>&1 && echo 'OTEL Collector is healthy' || echo 'OTEL Collector is unhealthy';
+          sleep 30;
+        done
+      "
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    depends_on:
+      - otel-collector
+
+  # === WORKFLOW SERVICES ===
+  # n8n PostgreSQL Database
+  n8n-postgres:
+    image: postgres:16-alpine
+    container_name: keiko-n8n-postgres
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n_user
+      POSTGRES_PASSWORD: n8n_password
+    volumes:
+      - n8n-postgres-data:/var/lib/postgresql/data
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n_user -d n8n"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:1.0.5
+    container_name: keiko-n8n
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n-postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n_user
+      - DB_POSTGRESDB_PASSWORD=n8n_password
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    depends_on:
+      - n8n-postgres
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # === EDGE COMPUTING SERVICES ===
+  # Edge Registry
+  edge-registry:
+    image: registry:2.8
+    container_name: keiko-edge-registry
+    environment:
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    volumes:
+      - edge-registry-data:/var/lib/registry
+    ports:
+      - "8080:5000"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Edge Node 1
+  edge-node-1:
+    image: nginx:1.25-alpine
+    container_name: keiko-edge-node-1
+    ports:
+      - "8082:80"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Edge Node 2
+  edge-node-2:
+    image: nginx:1.25-alpine
+    container_name: keiko-edge-node-2
+    ports:
+      - "8084:80"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Edge Node 3
+  edge-node-3:
+    image: nginx:1.25-alpine
+    container_name: keiko-edge-node-3
+    ports:
+      - "8086:80"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Edge Load Balancer
+  edge-load-balancer:
+    image: nginx:1.25-alpine
+    container_name: keiko-edge-load-balancer
+    ports:
+      - "8088:80"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    depends_on:
+      - edge-node-1
+      - edge-node-2
+      - edge-node-3
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Edge Monitor
+  edge-monitor:
+    image: nginx:1.25-alpine
+    container_name: keiko-edge-monitor
+    ports:
+      - "8090:80"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  keiko-network:
+    external: true
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  nats-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  n8n-postgres-data:
+    driver: local
+  n8n-data:
+    driver: local
+  edge-registry-data:
+    driver: local

@@ -1,0 +1,328 @@
+# backend/services/orchestrator/k8s/deployment.yaml
+"""Kubernetes Deployment für Orchestrator Service."""
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator-service
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+    component: orchestration
+    version: v1.0.0
+    tier: backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: orchestrator-service
+  template:
+    metadata:
+      labels:
+        app: orchestrator-service
+        component: orchestration
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/api/v1/orchestrator/metrics"
+    spec:
+      serviceAccountName: orchestrator-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: orchestrator-service
+        image: keiko/orchestrator-service:v1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9090
+          protocol: TCP
+        - name: metrics
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: SERVICE_NAME
+          value: "orchestrator-service"
+        - name: SERVICE_VERSION
+          value: "v1.0.0"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: MAX_CONCURRENT_ORCHESTRATIONS
+          value: "20"
+        - name: ORCHESTRATION_TIMEOUT_SECONDS
+          value: "3600"
+        - name: TASK_DECOMPOSITION_ENABLED
+          value: "true"
+        - name: PERFORMANCE_PREDICTION_ENABLED
+          value: "true"
+        - name: MONITORING_ENABLED
+          value: "true"
+        - name: RECOVERY_ENABLED
+          value: "true"
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: orchestrator-secrets
+              key: database-url
+        # Message Bus Configuration
+        - name: NATS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: orchestrator-config
+              key: nats-url
+        # Redis Configuration
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: orchestrator-config
+              key: redis-url
+        # Service Discovery
+        - name: TASK_DECOMPOSITION_SERVICE_URL
+          value: "http://task-decomposition-service:8080"
+        - name: PERFORMANCE_PREDICTION_SERVICE_URL
+          value: "http://performance-prediction-service:8080"
+        - name: AGENT_REGISTRY_SERVICE_URL
+          value: "http://agent-registry-service:8080"
+        - name: TASK_MANAGER_SERVICE_URL
+          value: "http://task-manager-service:8080"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/orchestrator/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/orchestrator/health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/v1/orchestrator/health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: temp-volume
+          mountPath: /tmp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: orchestrator-config
+      - name: logs-volume
+        emptyDir: {}
+      - name: temp-volume
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - orchestrator-service
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator-service
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+    component: orchestration
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: grpc
+    port: 9090
+    targetPort: grpc
+    protocol: TCP
+  - name: metrics
+    port: 8081
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: orchestrator-service
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestrator-service
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: orchestrator-service
+  labels:
+    app: orchestrator-service
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: orchestrator-service
+  labels:
+    app: orchestrator-service
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: orchestrator-service
+subjects:
+- kind: ServiceAccount
+  name: orchestrator-service
+  namespace: keiko-platform
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-config
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+data:
+  nats-url: "nats://nats-service:4222"
+  redis-url: "redis://redis-service:6379"
+  log-level: "INFO"
+  max-concurrent-orchestrations: "20"
+  orchestration-timeout: "3600"
+  health-check-interval: "60"
+  metrics-collection-interval: "300"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orchestrator-secrets
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+type: Opaque
+data:
+  # Base64 encoded values
+  database-url: cG9zdGdyZXNxbDovL3VzZXI6cGFzc0BkYi1zZXJ2aWNlOjU0MzIva2Vpa29fZGI=
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orchestrator-service-pdb
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: orchestrator-service
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator-service-hpa
+  namespace: keiko-platform
+  labels:
+    app: orchestrator-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orchestrator-service
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60

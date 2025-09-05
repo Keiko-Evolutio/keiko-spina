@@ -1,0 +1,30 @@
+# Jaeger Distributed Tracing Service
+# Distributed tracing for microservices
+
+services:
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: keiko-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - SPAN_STORAGE_TYPE=memory
+      - MEMORY_MAX_TRACES=50000
+      - QUERY_BASE_PATH=/jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "14268:14268"   # Jaeger collector HTTP
+      - "14250:14250"   # Jaeger collector gRPC
+      - "6831:6831/udp" # Jaeger agent UDP
+      - "6832:6832/udp" # Jaeger agent UDP
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+

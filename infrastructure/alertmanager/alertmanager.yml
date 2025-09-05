@@ -1,0 +1,100 @@
+route:
+  receiver: default
+  group_by: ["alertname", "severity", "tenant"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 2h
+  routes:
+    # Startup orchestration critical alerts - immediate notification
+    - matchers:
+        - severity="critical"
+        - component="startup-orchestrator"
+      receiver: startup-critical
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+
+    # Backend startup critical alerts
+    - matchers:
+        - severity="critical"
+        - component="backend"
+      receiver: backend-critical
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+
+    # Infrastructure team alerts
+    - matchers:
+        - team="infrastructure"
+      receiver: infrastructure-team
+      group_wait: 30s
+      repeat_interval: 30m
+      continue: true
+
+    # General critical alerts
+    - matchers:
+        - severity="critical"
+      receiver: critical
+      continue: true
+
+    # General warning alerts
+    - matchers:
+        - severity="warning"
+      receiver: warning
+      continue: true
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+
+  - name: startup-critical
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/startup-critical"
+        send_resolved: true
+    # slack_configs:
+    #   - api_url: "SLACK_WEBHOOK_URL_PLACEHOLDER"
+    #     channel: "#keiko-alerts"
+    #     title: "🚨 CRITICAL: Keiko Startup Failure"
+    #     text: |
+    #       {{ range .Alerts }}
+    #       *Alert:* {{ .Annotations.summary }}
+    #       *Description:* {{ .Annotations.description }}
+    #       *Environment:* {{ .Labels.environment }}
+    #       *Component:* {{ .Labels.component }}
+    #       *Runbook:* {{ .Annotations.runbook_url }}
+    #       {{ end }}
+
+  - name: backend-critical
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/backend-critical"
+        send_resolved: true
+    # slack_configs:
+    #   - api_url: "SLACK_WEBHOOK_URL_PLACEHOLDER"
+    #     channel: "#keiko-backend"
+    #     title: "🚨 CRITICAL: Backend Startup Failure"
+
+  - name: infrastructure-team
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/infrastructure"
+        send_resolved: true
+    # email_configs:
+    #   - to: "INFRASTRUCTURE_TEAM_EMAIL_PLACEHOLDER"
+    #     from: "alerts@keiko.dev"
+    #     subject: "Keiko Infrastructure Alert"
+
+  - name: critical
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+
+  - name: warning
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: ["alertname", "tenant"]

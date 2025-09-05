@@ -1,0 +1,53 @@
+<component name="ProjectCodeStyleConfiguration">
+    <code_scheme name="Project" version="173">
+        <!-- Python-spezifische Einstellungen (entspricht pyproject.toml Ruff-Config) -->
+        <Python>
+            <option name="OPTIMIZE_IMPORTS_ON_THE_FLY" value="true"/>
+            <option name="USE_CONTINUATION_INDENT_FOR_ARGUMENTS" value="true"/>
+            <option name="USE_CONTINUATION_INDENT_FOR_PARAMETERS" value="true"/>
+            <option name="ALIGN_COLLECTIONS_AND_COMPREHENSIONS" value="true"/>
+            <option name="SPACE_AFTER_PY_COLON" value="true"/>
+            <option name="SPACE_BEFORE_PY_COLON" value="false"/>
+            <option name="SPACE_AROUND_EQ_IN_NAMED_PARAMETER" value="false"/>
+            <option name="SPACE_AROUND_EQ_IN_KEYWORD_ARGUMENT" value="false"/>
+            <option name="SPACE_WITHIN_BRACES" value="false"/>
+            <option name="QUOTE_TYPE" value="DOUBLE"/>
+            <option name="DICT_NEW_LINE_AFTER_LEFT_BRACE" value="false"/>
+            <option name="DICT_NEW_LINE_BEFORE_RIGHT_BRACE" value="false"/>
+            <!-- Entspricht Ruff line-length = 100 -->
+            <option name="RIGHT_MARGIN" value="100"/>
+            <!-- Import-Optimierung entspricht isort/ruff -->
+            <option name="OPTIMIZE_IMPORTS_SORT_NAMES_IN_FROM_IMPORTS" value="true"/>
+            <option name="OPTIMIZE_IMPORTS_JOIN_FROM_IMPORTS_WITH_SAME_SOURCE" value="true"/>
+            <option name="OPTIMIZE_IMPORTS_ALWAYS_SPLIT_FROM_IMPORTS" value="false"/>
+        </Python>
+
+        <!-- Allgemeine Formatierung -->
+        <option name="RIGHT_MARGIN" value="100"/>
+        <option name="WRAP_WHEN_TYPING_REACHES_RIGHT_MARGIN" value="true"/>
+        <option name="FORMATTER_TAGS_ENABLED" value="true"/>
+
+        <!-- YAML/Docker-Konfiguration -->
+        <YAML>
+            <option name="INDENT_SIZE" value="2"/>
+            <option name="SPACES_WITHIN_BRACES" value="true"/>
+            <option name="SPACES_WITHIN_BRACKETS" value="true"/>
+        </YAML>
+
+        <!-- JSON-Konfiguration -->
+        <JSON>
+            <option name="SPACE_AFTER_COLON" value="true"/>
+            <option name="SPACE_BEFORE_COLON" value="false"/>
+            <option name="KEEP_TRAILING_COMMA" value="false"/>
+            <option name="WRAP_LONG_LINES" value="true"/>
+        </JSON>
+
+        <!-- Markdown-Konfiguration -->
+        <Markdown>
+            <option name="MAX_LINES_AROUND_HEADER" value="1"/>
+            <option name="MIN_LINES_AROUND_HEADER" value="1"/>
+            <option name="WRAP_TEXT_IF_LONG" value="true"/>
+            <option name="WRAP_TEXT_INSIDE_BLOCKQUOTES" value="true"/>
+        </Markdown>
+    </code_scheme>
+</component>

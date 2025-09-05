@@ -1,0 +1,253 @@
+# backend/.pre-commit-config.yaml
+
+default_language_version:
+  python: python3.12
+
+default_stages: [ pre-commit, pre-merge-commit ]
+
+repos:
+  # =====================================================================
+  # Core Foundation Layer - Essential Code Hygiene
+  # =====================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\\.md$|\\.rst$'
+      - id: end-of-file-fixer
+        exclude: '\\.json$|\\.svg$'
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [ '--maxkb=10240' ]  # 10MB limit für AI model artifacts
+
+      # FIXED: Nur EINE check-yaml Definition mit mkdocs.yml Ausnahme
+      - id: check-yaml
+        name: "YAML Syntax Validation"
+        exclude: '^(mkdocs\\.yml$|\\.github/|k8s/|docker-compose)'
+
+      - id: check-json
+        exclude: '\\.vscode/|\\.idea/'
+      - id: check-toml
+      - id: check-ast
+        language_version: python3.12
+      - id: debug-statements
+        exclude: '^(tests/|scripts/debug/)'
+
+  # =====================================================================
+  # Modern Python Code Quality Stack - Ruff (All-in-One Solution)
+  # =====================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.5
+    hooks:
+      - id: ruff
+        name: "Ruff Linting (Fast Python Linter)"
+        args: [
+          --fix,
+          --exit-non-zero-on-fix,
+          --show-fixes,
+          --target-version=py312
+        ]
+        files: '\\.py$'
+        exclude: '^(migrations/|alembic/|__pycache__)'
+
+      - id: ruff-format
+        name: "Ruff Formatting (Black-compatible)"
+        args: [ --target-version=py312 ]
+        files: '\\.py$'
+        exclude: '^(migrations/|alembic/|__pycache__)'
+
+  # =====================================================================
+  # Advanced Type Safety für AI/ML Code
+  # =====================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.0
+    hooks:
+      - id: mypy
+        name: "MyPy Static Type Checking"
+        args: [
+          --config-file=pyproject.toml,
+          --show-error-codes,
+          --pretty,
+          --no-error-summary
+        ]
+        additional_dependencies: [
+          # Core typing extensions für AI/ML
+          types-requests>=2.31.0,
+          types-redis>=4.6.0,
+          types-python-dateutil>=2.8.0,
+          types-PyYAML>=6.0.0,
+          # FastAPI ecosystem
+          fastapi>=0.104.0,
+          pydantic>=2.5.0,
+          # Azure SDK types
+          azure-core>=1.29.0,
+          azure-identity>=1.15.0
+        ]
+        files: '^(agents|services|config|data_models)/.*\\.py$'
+        exclude: '^(tests/|migrations/|__pycache__)'
+        stages: [ pre-commit ]
+
+  # =====================================================================
+  # Enterprise Security & Compliance Layer
+  # =====================================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        name: "Bandit Security Scanner"
+        args: [
+          -r,
+          --skip, "B101,B601,B602",  # Skip assert_used, shell_injection für Tests
+          --exclude, "tests/,scripts/,docs/"
+        ]
+        files: '\\.py$'
+        exclude: '^(tests/|scripts/test|docs/)'
+
+  # Simplified Gitleaks - zero configuration required
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        name: "Gitleaks Secret Detection"
+        stages: [ pre-commit, pre-push ]
+
+  # =====================================================================
+  # Minimal Secret Detection - No Baseline Required
+  # =====================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: "Advanced Secret Detection"
+        args: [
+          --exclude-files, '\\.lock$|\\.min\\.js$|\\.svg$'
+        ]
+        exclude: '^(tests/fixtures/|docs/examples/)'
+
+  # =====================================================================
+  # Documentation Quality
+  # =====================================================================
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: "Docstring Style Enforcement"
+        args: [
+          --convention=google,  # Google style für AI/ML documentation
+          --add-ignore=D100,D104,D105,D107  # Skip module/package docs
+        ]
+        files: '^(agents|services)/.*\\.py$'
+        exclude: '^(tests/|migrations/|__init__\\.py$)'
+
+  # =====================================================================
+  # Python Modernization
+  # =====================================================================
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.20.0
+    hooks:
+      - id: pyupgrade
+        name: "Python Syntax Modernization"
+        args: [ --py312-plus ]
+        files: '\\.py$'
+        exclude: '^(migrations/|scripts/legacy/)'
+
+  # =====================================================================
+  # Import Organization - Simplified Configuration
+  # =====================================================================
+  - repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        name: "Import Organization"
+        args: [
+          --profile=black,
+          --line-length=88,
+          --multi-line=3
+        ]
+        files: '\\.py$'
+        exclude: '^(migrations/|__pycache__)'
+
+  # =====================================================================
+  # Infrastructure & Configuration Validation
+  # =====================================================================
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        name: "YAML Lint für Kubernetes/Azure Configs"
+        args: [
+          -d, "{extends: relaxed, rules: {line-length: {max: 120}}}"
+        ]
+        files: '\\.(yaml|yml)$'
+        exclude: '^(\\.pre-commit-config\\.yaml$|docker-compose|mkdocs\\.yml$)'
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.33.2
+    hooks:
+      - id: check-azure-pipelines
+        name: "Azure DevOps Pipeline Validation"
+        files: 'azure-pipelines.*\\.ya?ml$|\\.azure/.*\\.ya?ml$'
+
+      - id: check-github-workflows
+        name: "GitHub Actions Workflow Validation"
+        files: '^\\.github/workflows/.*\\.ya?ml$'
+
+  # =====================================================================
+  # Documentation & Knowledge Management
+  # =====================================================================
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.22
+    hooks:
+      - id: mdformat
+        name: "Markdown Formatting"
+        args: [
+          --wrap=88,
+          --end-of-line=lf
+        ]
+        additional_dependencies: [
+          mdformat-gfm>=0.3.5,      # GitHub Flavored Markdown
+          mdformat-black>=0.1.1,    # Code block formatting
+          mdformat-tables>=0.4.1    # Table formatting
+        ]
+        files: '\\.md$'
+        exclude: '^(CHANGELOG\\.md$|docs/api/)'
+
+  # =====================================================================
+  # Performance Optimization - Heavy Operations on Push Only
+  # =====================================================================
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.4.2
+    hooks:
+      - id: python-safety-dependencies-check
+        name: "Safety Vulnerability Scanner"
+        stages: [ pre-push ]  # Only on push to avoid commit delays
+        files: 'requirements|pyproject\\.toml|uv\\.lock'
+
+  - repo: https://github.com/asottile/dead
+    rev: v2.1.0
+    hooks:
+      - id: dead
+        name: "Dead Code Detection"
+        args: [ --exclude=__init__.py,migrations/ ]
+        files: '\\.py$'
+        exclude: '^(tests/|migrations/|__init__\\.py$)'
+        stages: [ pre-push ]  # Heavy operation - only on push
+
+# =====================================================================
+# Pre-commit.ci Configuration für automatisierte Updates
+# =====================================================================
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: 'main'
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: 'weekly'
+  skip: [
+    # Skip heavy/slow hooks in CI for performance
+    python-safety-dependencies-check,
+    dead
+  ]
+  submodules: fa

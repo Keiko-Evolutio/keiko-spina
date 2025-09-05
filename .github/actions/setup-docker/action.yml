@@ -1,0 +1,295 @@
+name: 'Setup Docker Environment'
+description: 'Sets up Docker environment with services and containers'
+branding:
+  icon: 'box'
+  color: 'blue'
+
+inputs:
+  compose-file:
+    description: 'Docker Compose file to use'
+    required: false
+    default: 'docker-compose.yml'
+  services:
+    description: 'Specific services to start (space-separated, empty for all)'
+    required: false
+    default: ''
+  wait-for-services:
+    description: 'Wait for services to be healthy'
+    required: false
+    default: 'true'
+  wait-timeout:
+    description: 'Timeout for waiting for services (seconds)'
+    required: false
+    default: '120'
+  build-images:
+    description: 'Build images before starting services'
+    required: false
+    default: 'false'
+  pull-images:
+    description: 'Pull latest images before starting'
+    required: false
+    default: 'true'
+  cleanup-on-failure:
+    description: 'Cleanup containers on failure'
+    required: false
+    default: 'true'
+  working-directory:
+    description: 'Working directory for Docker operations'
+    required: false
+    default: '.'
+  environment-file:
+    description: 'Environment file to use'
+    required: false
+    default: ''
+
+outputs:
+  services-started:
+    description: 'List of services that were started'
+    value: ${{ steps.start-services.outputs.services-started }}
+  container-ids:
+    description: 'Container IDs of started services'
+    value: ${{ steps.start-services.outputs.container-ids }}
+  setup-duration:
+    description: 'Time taken to setup Docker environment'
+    value: ${{ steps.start-services.outputs.setup-duration }}
+  health-status:
+    description: 'Health status of services'
+    value: ${{ steps.health-check.outputs.health-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 💾 Docker Layer Caching
+      uses: ./.github/actions/advanced-cache
+      with:
+        cache-type: docker
+        cache-paths: |
+          /tmp/.buildx-cache
+          ~/.docker
+        working-directory: ${{ inputs.working-directory }}
+        cache-warming: true
+        max-cache-size: 4096
+
+    - name: 🐳 Prepare Docker Environment
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🐳 Preparing Docker environment..."
+
+        # Check if Docker is available
+        if ! command -v docker &> /dev/null; then
+          echo "❌ Docker is not available"
+          exit 1
+        fi
+
+        # Check if Docker Compose is available
+        if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+          echo "❌ Docker Compose is not available"
+          exit 1
+        fi
+
+        # Determine compose command
+        if docker compose version &> /dev/null; then
+          echo "compose_cmd=docker compose" >> $GITHUB_ENV
+        else
+          echo "compose_cmd=docker-compose" >> $GITHUB_ENV
+        fi
+
+        # Check if compose file exists
+        if [ ! -f "${{ inputs.compose-file }}" ]; then
+          echo "❌ Docker Compose file not found: ${{ inputs.compose-file }}"
+          exit 1
+        fi
+
+        # Setup Docker buildx for advanced caching
+        docker buildx create --use --driver docker-container --name builder || true
+        docker buildx inspect --bootstrap || true
+
+        echo "✅ Docker environment ready"
+        echo "📋 Docker version: $(docker --version)"
+        echo "📋 Compose file: ${{ inputs.compose-file }}"
+
+    - name: 🧹 Cleanup Existing Containers
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🧹 Cleaning up existing containers..."
+        
+        # Stop and remove any existing containers from this compose file
+        ${{ env.compose_cmd }} -f ${{ inputs.compose-file }} down -v --remove-orphans || true
+        
+        # Clean up any dangling containers
+        docker container prune -f || true
+        
+        echo "✅ Cleanup completed"
+
+    - name: 🚀 Start Docker Services
+      id: start-services
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🚀 Starting Docker services..."
+        start_time=$(date +%s)
+        
+        # Build compose command
+        compose_cmd="${{ env.compose_cmd }} -f ${{ inputs.compose-file }}"
+        
+        # Add environment file if specified
+        if [ -n "${{ inputs.environment-file }}" ]; then
+          compose_cmd="$compose_cmd --env-file ${{ inputs.environment-file }}"
+        fi
+        
+        # Pull images if requested
+        if [ "${{ inputs.pull-images }}" = "true" ]; then
+          echo "📥 Pulling latest images..."
+          $compose_cmd pull || echo "⚠️ Some images could not be pulled"
+        fi
+        
+        # Build images if requested with layer caching
+        if [ "${{ inputs.build-images }}" = "true" ]; then
+          echo "🔨 Building images with layer caching..."
+
+          # Use buildx for advanced caching
+          export DOCKER_BUILDKIT=1
+          export COMPOSE_DOCKER_CLI_BUILD=1
+
+          # Build with cache mount
+          $compose_cmd build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg DOCKER_BUILDKIT=1
+        fi
+        
+        # Start services
+        if [ -n "${{ inputs.services }}" ]; then
+          echo "🎯 Starting specific services: ${{ inputs.services }}"
+          $compose_cmd up -d ${{ inputs.services }}
+          services_started="${{ inputs.services }}"
+        else
+          echo "🎯 Starting all services..."
+          $compose_cmd up -d
+          services_started=$(docker-compose -f ${{ inputs.compose-file }} config --services | tr '\n' ' ')
+        fi
+        
+        # Get container IDs
+        container_ids=$($compose_cmd ps -q | tr '\n' ' ')
+        
+        # Calculate setup duration
+        end_time=$(date +%s)
+        setup_duration=$((end_time - start_time))
+        
+        # Set outputs
+        echo "services-started=$services_started" >> $GITHUB_OUTPUT
+        echo "container-ids=$container_ids" >> $GITHUB_OUTPUT
+        echo "setup-duration=$setup_duration" >> $GITHUB_OUTPUT
+        
+        echo "✅ Services started successfully"
+        echo "📋 Services: $services_started"
+        echo "📋 Container IDs: $container_ids"
+        echo "⏱️ Setup duration: ${setup_duration}s"
+
+    - name: 🏥 Health Check Services
+      id: health-check
+      if: inputs.wait-for-services == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🏥 Checking service health..."
+        
+        compose_cmd="${{ env.compose_cmd }} -f ${{ inputs.compose-file }}"
+        wait_timeout=${{ inputs.wait-timeout }}
+        start_time=$(date +%s)
+        
+        # Function to check if all services are healthy
+        check_health() {
+          local all_healthy=true
+          local health_status=""
+          
+          # Get service status
+          while IFS= read -r line; do
+            if [[ $line == *"Up"* ]]; then
+              if [[ $line == *"(healthy)"* ]]; then
+                service_name=$(echo "$line" | awk '{print $1}')
+                health_status="$health_status $service_name:healthy"
+              elif [[ $line == *"(unhealthy)"* ]]; then
+                service_name=$(echo "$line" | awk '{print $1}')
+                health_status="$health_status $service_name:unhealthy"
+                all_healthy=false
+              else
+                # Service is up but no health check defined
+                service_name=$(echo "$line" | awk '{print $1}')
+                health_status="$health_status $service_name:up"
+              fi
+            else
+              all_healthy=false
+            fi
+          done < <($compose_cmd ps)
+          
+          echo "$health_status"
+          return $([ "$all_healthy" = true ] && echo 0 || echo 1)
+        }
+        
+        # Wait for services to be healthy
+        echo "⏳ Waiting for services to be healthy (timeout: ${wait_timeout}s)..."
+        
+        while [ $(($(date +%s) - start_time)) -lt $wait_timeout ]; do
+          health_status=$(check_health)
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ All services are healthy"
+            echo "health-status=$health_status" >> $GITHUB_OUTPUT
+            
+            # Show final status
+            echo "📊 Final service status:"
+            $compose_cmd ps
+            
+            exit 0
+          fi
+          
+          echo "⏳ Waiting for services... ($(($wait_timeout - $(date +%s) + start_time))s remaining)"
+          sleep 5
+        done
+        
+        # Timeout reached
+        echo "⏰ Timeout reached waiting for services to be healthy"
+        echo "📊 Current service status:"
+        $compose_cmd ps
+        
+        # Show logs for debugging
+        echo "📋 Service logs:"
+        $compose_cmd logs --tail=50
+        
+        health_status=$(check_health)
+        echo "health-status=$health_status" >> $GITHUB_OUTPUT
+        
+        if [ "${{ inputs.cleanup-on-failure }}" = "true" ]; then
+          echo "🧹 Cleaning up due to health check failure..."
+          $compose_cmd down -v
+        fi
+        
+        exit 1
+
+    - name: 📊 Generate Docker Summary
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "## 🐳 Docker Environment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Compose File** | \`${{ inputs.compose-file }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Services Started** | ${{ steps.start-services.outputs.services-started }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Setup Duration** | ${{ steps.start-services.outputs.setup-duration }}s |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Wait for Health** | ${{ inputs.wait-for-services }} |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.wait-for-services }}" = "true" ]; then
+          echo "| **Health Status** | ${{ steps.health-check.outputs.health-status }} |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add current container status
+        echo "### 📊 Container Status" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        ${{ env.compose_cmd }} -f ${{ inputs.compose-file }} ps >> $GITHUB_STEP_SUMMARY || echo "No containers running" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

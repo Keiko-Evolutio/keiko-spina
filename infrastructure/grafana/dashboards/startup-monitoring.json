@@ -1,0 +1,431 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Keiko Startup Monitoring",
+    "tags": ["keiko", "startup", "orchestration"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Startup Orchestration Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_startup_orchestration_status",
+            "legendFormat": "{{environment}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "Unknown",
+                    "color": "gray"
+                  },
+                  "1": {
+                    "text": "Starting",
+                    "color": "yellow"
+                  },
+                  "2": {
+                    "text": "Ready",
+                    "color": "green"
+                  },
+                  "3": {
+                    "text": "Failed",
+                    "color": "red"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "gray",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "green",
+                  "value": 2
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Startup Duration",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_startup_orchestration_duration_seconds",
+            "legendFormat": "Duration (seconds)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 300
+                },
+                {
+                  "color": "red",
+                  "value": 600
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Service Health Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "keiko_service_health_check_status",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "job": true,
+                "instance": true
+              },
+              "renameByName": {
+                "service_name": "Service",
+                "service_category": "Category",
+                "container_name": "Container",
+                "required_for_startup": "Required",
+                "Value": "Status"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Status"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "options": {
+                        "0": {
+                          "text": "Unhealthy",
+                          "color": "red"
+                        },
+                        "1": {
+                          "text": "Healthy",
+                          "color": "green"
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Startup Failures Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "increase(keiko_startup_orchestration_failures_total[5m])",
+            "legendFormat": "{{environment}} - {{error_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {
+                "mode": "none",
+                "group": "A"
+              },
+              "axisPlacement": "auto",
+              "axisLabel": "",
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Backend Startup Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_backend_startup_status",
+            "legendFormat": "Backend Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "Unknown",
+                    "color": "gray"
+                  },
+                  "1": {
+                    "text": "Starting",
+                    "color": "yellow"
+                  },
+                  "2": {
+                    "text": "Ready",
+                    "color": "green"
+                  },
+                  "3": {
+                    "text": "Failed",
+                    "color": "red"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Dependency Check Failures",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_backend_startup_dependency_check_failed",
+            "legendFormat": "{{failed_dependencies}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "All OK",
+                    "color": "green"
+                  },
+                  "1": {
+                    "text": "Failed",
+                    "color": "red"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "Service Health by Category",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "count by (service_category) (keiko_service_health_check_status == 1)",
+            "legendFormat": "{{service_category}} (Healthy)"
+          },
+          {
+            "expr": "count by (service_category) (keiko_service_health_check_status == 0)",
+            "legendFormat": "{{service_category}} (Unhealthy)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              }
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "Startup Performance Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "keiko_startup_orchestration_duration_seconds",
+            "legendFormat": "{{environment}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "auto",
+              "pointSize": 5
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 300
+                },
+                {
+                  "color": "red",
+                  "value": 600
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "query": "label_values(keiko_startup_orchestration_status, environment)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Startup Events",
+          "datasource": "Prometheus",
+          "expr": "changes(keiko_startup_orchestration_status[1m]) > 0",
+          "titleFormat": "Startup Status Change",
+          "textFormat": "Status changed to {{value}}"
+        }
+      ]
+    }
+  }
+}

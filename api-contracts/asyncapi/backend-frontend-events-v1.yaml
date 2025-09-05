@@ -1,0 +1,576 @@
+asyncapi: 3.0.0
+info:
+  title: Keiko Real-time Events
+  version: 1.0.0
+  description: |
+    Real-time event communication between Keiko Backend and Frontend.
+    Uses WebSocket for bi-directional communication and server-sent events
+    for real-time updates.
+  contact:
+    name: Keiko Development Team
+    email: dev@keiko.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+defaultContentType: application/json
+
+servers:
+  development:
+    host: localhost:8000
+    protocol: ws
+    description: Development WebSocket server
+    security:
+      - bearerAuth: []
+  production:
+    host: api.keiko.ai
+    protocol: wss
+    description: Production WebSocket server
+    security:
+      - bearerAuth: []
+
+channels:
+  # Agent Status Events
+  agent.status:
+    address: agent.status
+    title: Agent Status Updates
+    description: Real-time updates about agent status changes
+    messages:
+      AgentStatusUpdate:
+        $ref: '#/components/messages/AgentStatusUpdate'
+
+  # Agent Registration Events
+  agent.lifecycle:
+    address: agent.lifecycle
+    title: Agent Lifecycle Events
+    description: Events for agent registration, deregistration, and lifecycle changes
+    messages:
+      AgentRegistered:
+        $ref: '#/components/messages/AgentRegistered'
+      AgentDeregistered:
+        $ref: '#/components/messages/AgentDeregistered'
+
+  # Function Call Progress
+  function.progress:
+    address: function.progress.{request_id}
+    title: Function Call Progress
+    description: Real-time progress updates for long-running function calls
+    parameters:
+      request_id:
+        $ref: '#/components/parameters/RequestId'
+    messages:
+      FunctionProgress:
+        $ref: '#/components/messages/FunctionProgress'
+      FunctionComplete:
+        $ref: '#/components/messages/FunctionComplete'
+
+  # Voice Processing Events
+  voice.processing:
+    address: voice.processing.{session_id}
+    title: Voice Processing Events
+    description: Real-time updates during voice processing
+    parameters:
+      session_id:
+        $ref: '#/components/parameters/SessionId'
+    messages:
+      VoiceTranscriptionUpdate:
+        $ref: '#/components/messages/VoiceTranscriptionUpdate'
+      VoiceProcessingComplete:
+        $ref: '#/components/messages/VoiceProcessingComplete'
+
+  # System Health Events
+  system.health:
+    address: system.health
+    title: System Health Events
+    description: System-wide health and status updates
+    messages:
+      SystemHealthUpdate:
+        $ref: '#/components/messages/SystemHealthUpdate'
+      SystemAlert:
+        $ref: '#/components/messages/SystemAlert'
+
+  # User-specific Events
+  user.notifications:
+    address: user.notifications.{user_id}
+    title: User Notifications
+    description: User-specific notifications and updates
+    parameters:
+      user_id:
+        $ref: '#/components/parameters/UserId'
+    messages:
+      UserNotification:
+        $ref: '#/components/messages/UserNotification'
+
+operations:
+  # Subscribe to Agent Status Updates
+  onAgentStatusUpdate:
+    action: receive
+    channel:
+      $ref: '#/channels/agent.status'
+    summary: Receive agent status updates
+    description: Subscribe to real-time agent status changes
+
+  # Subscribe to Agent Lifecycle Events
+  onAgentLifecycle:
+    action: receive
+    channel:
+      $ref: '#/channels/agent.lifecycle'
+    summary: Receive agent lifecycle events
+    description: Subscribe to agent registration and deregistration events
+
+  # Subscribe to Function Progress
+  onFunctionProgress:
+    action: receive
+    channel:
+      $ref: '#/channels/function.progress'
+    summary: Receive function call progress
+    description: Subscribe to progress updates for function calls
+
+  # Subscribe to Voice Processing Events
+  onVoiceProcessing:
+    action: receive
+    channel:
+      $ref: '#/channels/voice.processing'
+    summary: Receive voice processing updates
+    description: Subscribe to voice processing progress and results
+
+  # Subscribe to System Health
+  onSystemHealth:
+    action: receive
+    channel:
+      $ref: '#/channels/system.health'
+    summary: Receive system health updates
+    description: Subscribe to system health and alert notifications
+
+  # Subscribe to User Notifications
+  onUserNotifications:
+    action: receive
+    channel:
+      $ref: '#/channels/user.notifications'
+    summary: Receive user notifications
+    description: Subscribe to user-specific notifications and updates
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    RequestId:
+      description: Unique request identifier
+      schema:
+        type: string
+        pattern: '^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$'
+
+    SessionId:
+      description: Session identifier
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+
+    UserId:
+      description: User identifier
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+
+  messages:
+    AgentStatusUpdate:
+      name: AgentStatusUpdate
+      title: Agent Status Update
+      summary: Agent status has changed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentStatusUpdatePayload'
+
+    AgentRegistered:
+      name: AgentRegistered
+      title: Agent Registered
+      summary: New agent has been registered
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentRegisteredPayload'
+
+    AgentDeregistered:
+      name: AgentDeregistered
+      title: Agent Deregistered
+      summary: Agent has been deregistered
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentDeregisteredPayload'
+
+    FunctionProgress:
+      name: FunctionProgress
+      title: Function Call Progress
+      summary: Function call progress update
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/FunctionProgressPayload'
+
+    FunctionComplete:
+      name: FunctionComplete
+      title: Function Call Complete
+      summary: Function call has completed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/FunctionCompletePayload'
+
+    VoiceTranscriptionUpdate:
+      name: VoiceTranscriptionUpdate
+      title: Voice Transcription Update
+      summary: Partial voice transcription result
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VoiceTranscriptionUpdatePayload'
+
+    VoiceProcessingComplete:
+      name: VoiceProcessingComplete
+      title: Voice Processing Complete
+      summary: Voice processing has completed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VoiceProcessingCompletePayload'
+
+    SystemHealthUpdate:
+      name: SystemHealthUpdate
+      title: System Health Update
+      summary: System health status has changed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/SystemHealthUpdatePayload'
+
+    SystemAlert:
+      name: SystemAlert
+      title: System Alert
+      summary: System alert notification
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/SystemAlertPayload'
+
+    UserNotification:
+      name: UserNotification
+      title: User Notification
+      summary: User-specific notification
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserNotificationPayload'
+
+  schemas:
+    BaseEvent:
+      type: object
+      required:
+        - event_id
+        - event_type
+        - timestamp
+      properties:
+        event_id:
+          type: string
+          description: Unique event identifier
+        event_type:
+          type: string
+          description: Type of event
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional event metadata
+
+    AgentStatusUpdatePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - agent_id
+            - status
+            - previous_status
+          properties:
+            agent_id:
+              type: string
+              description: Agent identifier
+            status:
+              type: string
+              enum: [online, offline, busy, error]
+              description: Current agent status
+            previous_status:
+              type: string
+              enum: [online, offline, busy, error]
+              description: Previous agent status
+            reason:
+              type: string
+              description: Reason for status change
+            capabilities:
+              type: array
+              items:
+                type: string
+              description: Current agent capabilities
+
+    AgentRegisteredPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - agent_id
+            - agent_type
+            - capabilities
+          properties:
+            agent_id:
+              type: string
+              description: Agent identifier
+            platform_agent_id:
+              type: string
+              description: Platform-assigned agent ID
+            agent_type:
+              type: string
+              description: Type of agent
+            capabilities:
+              type: array
+              items:
+                type: string
+              description: Agent capabilities
+            metadata:
+              type: object
+              additionalProperties: true
+              description: Agent metadata
+
+    AgentDeregisteredPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - agent_id
+          properties:
+            agent_id:
+              type: string
+              description: Agent identifier
+            reason:
+              type: string
+              description: Reason for deregistration
+
+    FunctionProgressPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - request_id
+            - agent_id
+            - function_name
+            - progress_percent
+          properties:
+            request_id:
+              type: string
+              description: Function call request ID
+            agent_id:
+              type: string
+              description: Agent processing the function
+            function_name:
+              type: string
+              description: Name of the function being executed
+            progress_percent:
+              type: number
+              minimum: 0
+              maximum: 100
+              description: Progress percentage
+            status_message:
+              type: string
+              description: Current status message
+            estimated_completion:
+              type: string
+              format: date-time
+              description: Estimated completion time
+
+    FunctionCompletePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - request_id
+            - agent_id
+            - function_name
+            - success
+            - execution_time_ms
+          properties:
+            request_id:
+              type: string
+              description: Function call request ID
+            agent_id:
+              type: string
+              description: Agent that processed the function
+            function_name:
+              type: string
+              description: Name of the executed function
+            success:
+              type: boolean
+              description: Whether the function succeeded
+            result:
+              type: object
+              additionalProperties: true
+              description: Function result (if successful)
+            error:
+              type: string
+              description: Error message (if failed)
+            execution_time_ms:
+              type: integer
+              description: Execution time in milliseconds
+
+    VoiceTranscriptionUpdatePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - session_id
+            - partial_transcription
+            - confidence
+          properties:
+            session_id:
+              type: string
+              description: Voice processing session ID
+            partial_transcription:
+              type: string
+              description: Partial transcription text
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Transcription confidence
+            is_final:
+              type: boolean
+              description: Whether this is the final transcription
+            processing_time_ms:
+              type: integer
+              description: Processing time so far
+
+    VoiceProcessingCompletePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - session_id
+            - final_transcription
+            - confidence
+            - total_processing_time_ms
+          properties:
+            session_id:
+              type: string
+              description: Voice processing session ID
+            final_transcription:
+              type: string
+              description: Final transcription text
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Final transcription confidence
+            language_detected:
+              type: string
+              description: Detected language code
+            total_processing_time_ms:
+              type: integer
+              description: Total processing time
+            agent_response:
+              type: object
+              additionalProperties: true
+              description: Agent response (if applicable)
+
+    SystemHealthUpdatePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - overall_status
+            - services
+          properties:
+            overall_status:
+              type: string
+              enum: [healthy, degraded, unhealthy]
+              description: Overall system health
+            services:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  response_time_ms:
+                    type: integer
+                  last_check:
+                    type: string
+                    format: date-time
+              description: Individual service health status
+            resource_usage:
+              type: object
+              properties:
+                cpu_percent:
+                  type: number
+                memory_percent:
+                  type: number
+                disk_percent:
+                  type: number
+
+    SystemAlertPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - alert_type
+            - severity
+            - message
+          properties:
+            alert_type:
+              type: string
+              enum: [performance, error, security, maintenance]
+              description: Type of alert
+            severity:
+              type: string
+              enum: [info, warning, error, critical]
+              description: Alert severity
+            message:
+              type: string
+              description: Alert message
+            affected_services:
+              type: array
+              items:
+                type: string
+              description: List of affected services
+            resolution_steps:
+              type: array
+              items:
+                type: string
+              description: Suggested resolution steps
+
+    UserNotificationPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required:
+            - user_id
+            - notification_type
+            - title
+            - message
+          properties:
+            user_id:
+              type: string
+              description: User identifier
+            notification_type:
+              type: string
+              enum: [info, success, warning, error]
+              description: Type of notification
+            title:
+              type: string
+              description: Notification title
+            message:
+              type: string
+              description: Notification message
+            action_url:
+              type: string
+              format: uri
+              description: Optional action URL
+            expires_at:
+              type: string
+              format: date-time
+              description: Notification expiration time

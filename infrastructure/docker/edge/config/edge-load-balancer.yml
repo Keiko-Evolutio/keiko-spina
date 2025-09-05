@@ -1,0 +1,239 @@
+# Edge Load Balancer Configuration - Development
+# Konfiguration für intelligenten Load Balancer
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  name: "edge-load-balancer"
+  version: "1.0.0"
+  environment: "development"
+  
+# =============================================================================
+# Server Configuration
+# =============================================================================
+server:
+  host: "0.0.0.0"
+  port: 8088
+  health_port: 8089
+  workers: 2
+  max_connections: 500
+  keepalive_timeout: 65
+  request_timeout: 30
+
+# =============================================================================
+# Registry Configuration
+# =============================================================================
+registry:
+  url: "${REGISTRY_URL}"
+  sync_interval_seconds: 30
+  timeout_seconds: 10
+  retry_attempts: 3
+
+# =============================================================================
+# Load Balancing Configuration
+# =============================================================================
+load_balancing:
+  # Default Strategy
+  default_strategy: "${STRATEGY:-adaptive}"
+  
+  # Available Strategies
+  strategies:
+    round_robin:
+      enabled: true
+      weight: 1.0
+      
+    least_connections:
+      enabled: true
+      weight: 1.0
+      connection_threshold: 10
+      
+    latency_based:
+      enabled: true
+      weight: "${EDGE_LATENCY_WEIGHT:-0.4}"
+      latency_threshold_ms: 100
+      measurement_window_seconds: 60
+      
+    capacity_based:
+      enabled: true
+      weight: "${EDGE_CAPACITY_WEIGHT:-0.3}"
+      capacity_threshold: 0.8
+      cpu_weight: 0.6
+      memory_weight: 0.4
+      
+    adaptive:
+      enabled: true
+      learning_rate: 0.1
+      exploration_rate: 0.1
+      decay_factor: 0.95
+      weights:
+        latency: "${EDGE_LATENCY_WEIGHT:-0.4}"
+        capacity: "${EDGE_CAPACITY_WEIGHT:-0.3}"
+        reliability: "${EDGE_RELIABILITY_WEIGHT:-0.2}"
+        cost: "${EDGE_COST_WEIGHT:-0.1}"
+
+# =============================================================================
+# Routing Configuration
+# =============================================================================
+routing:
+  # Request Routing
+  request_routing:
+    enabled: true
+    timeout_seconds: 30
+    retry_attempts: 3
+    retry_delay_seconds: 1
+    
+  # Health-based Routing
+  health_routing:
+    enabled: true
+    health_check_interval_seconds: 30
+    unhealthy_threshold: 3
+    recovery_threshold: 2
+    
+  # Geographic Routing
+  geographic_routing:
+    enabled: true
+    prefer_local_region: true
+    region_preference_weight: 0.2
+    
+  # Capability-based Routing
+  capability_routing:
+    enabled: true
+    strict_capability_matching: false
+    capability_weight: 0.3
+
+# =============================================================================
+# Performance Configuration
+# =============================================================================
+performance:
+  # Caching
+  caching:
+    enabled: true
+    routing_cache_ttl_seconds: 60
+    node_status_cache_ttl_seconds: 30
+    max_cache_entries: 10000
+    
+  # Connection Pooling
+  connection_pooling:
+    enabled: true
+    max_connections_per_node: 20
+    connection_timeout_seconds: 10
+    idle_timeout_seconds: 300
+    
+  # Request Batching
+  request_batching:
+    enabled: false  # Disabled for development
+    max_batch_size: 10
+    batch_timeout_ms: 100
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+monitoring:
+  # Metrics Collection
+  metrics:
+    enabled: true
+    collection_interval_seconds: 10
+    retention_hours: 24
+    
+  # Performance Tracking
+  performance_tracking:
+    enabled: true
+    track_latency: true
+    track_throughput: true
+    track_error_rate: true
+    track_node_utilization: true
+    
+  # Alerting
+  alerting:
+    enabled: true
+    alert_rules:
+      - name: "high_latency"
+        condition: "avg_latency_ms > 200"
+        severity: "warning"
+        duration: "5m"
+      - name: "high_error_rate"
+        condition: "error_rate > 0.1"
+        severity: "critical"
+        duration: "2m"
+      - name: "node_unavailable"
+        condition: "available_nodes < 1"
+        severity: "critical"
+        duration: "1m"
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Authentication
+  authentication:
+    enabled: false  # Disabled for development
+    api_key_required: false
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+    burst_size: 100
+    
+  # Request Validation
+  request_validation:
+    enabled: true
+    max_request_size_mb: 10
+    validate_content_type: true
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "DEBUG"
+  format: "json"
+  
+  # Log Destinations
+  destinations:
+    console:
+      enabled: true
+      level: "DEBUG"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "/app/logs/edge-load-balancer.log"
+      max_size_mb: 50
+      backup_count: 3
+      
+  # Request Logging
+  request_logging:
+    enabled: true
+    log_headers: false
+    log_body: false
+    log_response_time: true
+
+# =============================================================================
+# Development Configuration
+# =============================================================================
+development:
+  # Debug Features
+  debug:
+    enabled: true
+    detailed_errors: true
+    include_stack_traces: true
+    
+  # Mock Data
+  mock_data:
+    enabled: false
+    simulate_latency: false
+    
+  # Development Tools
+  tools:
+    auto_reload: true
+    debug_endpoints: true
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+features:
+  advanced_routing: true
+  machine_learning_optimization: false  # Disabled for development
+  predictive_scaling: false
+  geographic_optimization: true
+  real_time_adaptation: true

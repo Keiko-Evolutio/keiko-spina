@@ -1,0 +1,27 @@
+endpoints:
+- config:
+    burst_capacity: 5
+    endpoint_type: websocket
+    frames_per_second: 50.0
+    max_concurrent_streams: 10
+    requests_per_second: 2.0
+    algorithm_strategy: token_bucket
+    identification_strategy: session_id
+  description: WebSocket-Verbindungen
+  pattern: GET:/stream/ws/{session_id}
+  tags:
+  - websocket
+  - realtime
+- config:
+    burst_capacity: 10
+    endpoint_type: sse
+    frames_per_second: 30.0
+    max_concurrent_streams: 5
+    requests_per_second: 5.0
+    algorithm_strategy: token_bucket
+    identification_strategy: session_id
+  description: Server-Sent Events
+  pattern: GET:/stream/sse/{session_id}/{stream_id}
+  tags:
+  - sse
+  - monitoring

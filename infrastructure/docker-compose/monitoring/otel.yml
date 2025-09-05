@@ -1,0 +1,63 @@
+# OpenTelemetry Collector Services
+# Central telemetry collection and processing
+
+services:
+  # OpenTelemetry Collector - Central telemetry collection
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    container_name: keiko-otel-collector
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    volumes:
+      - ../../../otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ../../../logs:/logs
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8889:8889"   # Prometheus metrics
+      - "8888:8888"   # Collector metrics
+      - "13133:13133" # Health check endpoint
+    environment:
+      - GOMEMLIMIT=512MiB
+      # Logfire-kompatible OTEL-Konfiguration
+      # Backend sendet Daten an diesen Collector, der sie an Jaeger/Prometheus weiterleitet
+      # Für Logfire Cloud-Export: Zusätzliche Exporter in otel-collector-config.yaml konfigurieren
+    depends_on:
+      - jaeger
+      - prometheus
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:13133/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Health Check Service für OTel Collector
+  otel-healthcheck:
+    image: curlimages/curl:latest
+    container_name: keiko-otel-healthcheck
+    command: >
+      sh -c "
+        while true; do
+          if curl -f http://otel-collector:13133/ >/dev/null 2>&1; then
+            echo 'OTel Collector is healthy'
+          else
+            echo 'OTel Collector is not healthy'
+          fi
+          sleep 30
+        done
+      "
+    depends_on:
+      - otel-collector
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://otel-collector:13133/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+

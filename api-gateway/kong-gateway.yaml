@@ -1,0 +1,481 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keiko-gateway
+  labels:
+    name: keiko-gateway
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-gateway
+  namespace: keiko-gateway
+  labels:
+    app: kong-gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kong-gateway
+  template:
+    metadata:
+      labels:
+        app: kong-gateway
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.4
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/kong/declarative/kong.yml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+        - name: KONG_PLUGINS
+          value: "bundled,rate-limiting,cors,jwt,key-auth,prometheus,zipkin"
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8443
+          name: proxy-ssl
+        - containerPort: 8001
+          name: admin
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong/declarative
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-declarative-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway-service
+  namespace: keiko-gateway
+  labels:
+    app: kong-gateway
+spec:
+  type: LoadBalancer
+  ports:
+  - name: proxy
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: proxy-ssl
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  - name: admin
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  selector:
+    app: kong-gateway
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-declarative-config
+  namespace: keiko-gateway
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    
+    # Services Definition
+    services:
+    - name: keiko-backend
+      url: http://keiko-backend-service.keiko:8000
+      tags:
+        - backend
+        - api
+      
+    - name: keiko-frontend
+      url: http://keiko-frontend-service.keiko:3000
+      tags:
+        - frontend
+        - web
+      
+    - name: kei-agent-sdk
+      url: http://kei-agent-sdk-service.keiko-sdk:8080
+      tags:
+        - sdk
+        - agents
+    
+    - name: keiko-api-contracts
+      url: http://keiko-api-contracts-service.keiko:80
+      tags:
+        - contracts
+        - docs
+    
+    # Routes Definition
+    routes:
+    # Backend API Routes
+    - name: backend-api
+      service: keiko-backend
+      paths:
+        - /api/v1
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+      strip_path: false
+      preserve_host: true
+      tags:
+        - backend-api
+    
+    - name: backend-health
+      service: keiko-backend
+      paths:
+        - /health
+        - /ready
+        - /metrics
+      methods:
+        - GET
+      strip_path: false
+      tags:
+        - health
+    
+    # Frontend Routes
+    - name: frontend-app
+      service: keiko-frontend
+      paths:
+        - /
+      methods:
+        - GET
+      strip_path: false
+      preserve_host: true
+      tags:
+        - frontend
+    
+    # SDK API Routes
+    - name: sdk-api
+      service: kei-agent-sdk
+      paths:
+        - /sdk/v1
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+      strip_path: true
+      preserve_host: true
+      tags:
+        - sdk-api
+    
+    # API Contracts Routes
+    - name: api-docs
+      service: keiko-api-contracts
+      paths:
+        - /docs
+        - /openapi
+        - /asyncapi
+        - /protobuf
+      methods:
+        - GET
+      strip_path: false
+      tags:
+        - documentation
+    
+    # Plugins Configuration
+    plugins:
+    # Global Rate Limiting
+    - name: rate-limiting
+      config:
+        minute: 1000
+        hour: 10000
+        policy: local
+        fault_tolerant: true
+        hide_client_headers: false
+    
+    # CORS Plugin
+    - name: cors
+      config:
+        origins:
+          - "https://app.keiko.dev"
+          - "https://sdk.keiko.dev"
+          - "http://localhost:3000"
+          - "http://localhost:8080"
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-API-Key
+        exposed_headers:
+          - X-Auth-Token
+        credentials: true
+        max_age: 3600
+    
+    # JWT Authentication for Backend API
+    - name: jwt
+      route: backend-api
+      config:
+        uri_param_names:
+          - jwt
+        cookie_names:
+          - jwt
+        header_names:
+          - authorization
+        claims_to_verify:
+          - exp
+          - iss
+        key_claim_name: iss
+        secret_is_base64: false
+    
+    # API Key Authentication for SDK
+    - name: key-auth
+      route: sdk-api
+      config:
+        key_names:
+          - X-API-Key
+          - apikey
+        key_in_body: false
+        key_in_header: true
+        key_in_query: true
+        hide_credentials: true
+    
+    # Prometheus Metrics
+    - name: prometheus
+      config:
+        per_consumer: true
+        status_code_metrics: true
+        latency_metrics: true
+        bandwidth_metrics: true
+        upstream_health_metrics: true
+    
+    # Distributed Tracing
+    - name: zipkin
+      config:
+        http_endpoint: "http://jaeger-collector.monitoring:9411/api/v2/spans"
+        sample_ratio: 0.1
+        include_credential: true
+        traceid_byte_count: 16
+        spanid_byte_count: 8
+        default_service_name: "kong-gateway"
+    
+    # Request/Response Logging
+    - name: file-log
+      config:
+        path: "/tmp/access.log"
+        reopen: true
+    
+    # Backend-specific plugins
+    - name: rate-limiting
+      route: backend-api
+      config:
+        minute: 500
+        hour: 5000
+        policy: local
+        fault_tolerant: true
+    
+    # SDK-specific plugins
+    - name: rate-limiting
+      route: sdk-api
+      config:
+        minute: 200
+        hour: 2000
+        policy: local
+        fault_tolerant: true
+    
+    # Request Size Limiting
+    - name: request-size-limiting
+      config:
+        allowed_payload_size: 10
+        size_unit: megabytes
+        require_content_length: false
+    
+    # Response Rate Limiting
+    - name: response-ratelimiting
+      config:
+        limits:
+          video: 
+            minute: 10
+          image:
+            minute: 20
+    
+    # IP Restriction (if needed)
+    # - name: ip-restriction
+    #   config:
+    #     allow:
+    #       - 10.0.0.0/8
+    #       - 172.16.0.0/12
+    #       - 192.168.0.0/16
+    
+    # Consumers (API Keys/JWT Users)
+    consumers:
+    - username: keiko-frontend
+      tags:
+        - frontend
+        - web-app
+      keyauth_credentials:
+        - key: frontend-api-key-2024
+      jwt_secrets:
+        - key: keiko-frontend-jwt
+          secret: frontend-jwt-secret-key
+    
+    - username: kei-agent-sdk
+      tags:
+        - sdk
+        - agents
+      keyauth_credentials:
+        - key: sdk-api-key-2024
+      jwt_secrets:
+        - key: keiko-sdk-jwt
+          secret: sdk-jwt-secret-key
+    
+    - username: keiko-backend
+      tags:
+        - backend
+        - internal
+      jwt_secrets:
+        - key: keiko-backend-jwt
+          secret: backend-jwt-secret-key
+    
+    - username: monitoring-system
+      tags:
+        - monitoring
+        - metrics
+      keyauth_credentials:
+        - key: monitoring-api-key-2024
+
+---
+# Kong Admin API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-admin-service
+  namespace: keiko-gateway
+  labels:
+    app: kong-gateway
+spec:
+  type: ClusterIP
+  ports:
+  - name: admin
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  selector:
+    app: kong-gateway
+
+---
+# HPA for Kong Gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kong-gateway-hpa
+  namespace: keiko-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kong-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Network Policy for Kong Gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong-gateway-netpol
+  namespace: keiko-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app: kong-gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8443
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: keiko
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 3000
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: keiko-sdk
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53

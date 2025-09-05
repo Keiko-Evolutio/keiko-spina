@@ -1,0 +1,171 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Keiko SDK Monitoring",
+    "tags": ["keiko", "sdk", "agents"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "SDK Service Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"kei-agent-sdk\"}",
+            "legendFormat": "SDK Service"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Registered Agents",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_agents_registered_total",
+            "legendFormat": "Total Agents"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Active Agents",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_agents_active_total",
+            "legendFormat": "Active Agents"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Function Calls Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(keiko_function_calls_total[1m])) * 60",
+            "legendFormat": "Calls/min"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Agent Registration Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "keiko_agents_registered_total",
+            "legendFormat": "Registered Agents"
+          },
+          {
+            "expr": "keiko_agents_active_total",
+            "legendFormat": "Active Agents"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Function Call Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(keiko_function_calls_total{status=\"success\"}[5m])) / sum(rate(keiko_function_calls_total[5m]))",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 7,
+        "title": "Function Execution Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(keiko_function_execution_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(keiko_function_execution_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(keiko_function_execution_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Agent Types Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (agent_type) (keiko_agents_registered_total)",
+            "legendFormat": "{{agent_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 9,
+        "title": "SDK Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"kei-agent-sdk\"} / 1024 / 1024",
+            "legendFormat": "Memory (MB)"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 20}
+      },
+      {
+        "id": 10,
+        "title": "SDK CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=\"kei-agent-sdk\"}[5m]) * 100",
+            "legendFormat": "CPU (%)"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 20}
+      },
+      {
+        "id": 11,
+        "title": "gRPC Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "keiko_grpc_connections_active",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 20}
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+# PostgreSQL Database Services
+# Includes PostgreSQL database and pgAdmin management interface
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: keiko-postgres
+    environment:
+      POSTGRES_DB: keiko_dev
+      POSTGRES_USER: keiko_user
+      POSTGRES_PASSWORD: keiko_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keiko_user -d keiko_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # pgAdmin - PostgreSQL Administration
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: keiko-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@keiko.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    profiles:
+      - tools
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/misc/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+
+# Networks are defined in the main docker-compose.dev.yml

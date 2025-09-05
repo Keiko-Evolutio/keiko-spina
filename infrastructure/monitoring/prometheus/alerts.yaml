@@ -1,0 +1,127 @@
+groups:
+- name: keiko-platform-alerts
+  rules:
+  # Service Health Alerts
+  - alert: ServiceDown
+    expr: up{job=~"keiko-.*"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: "{{ $labels.job }}"
+    annotations:
+      summary: "Keiko service {{ $labels.job }} is down"
+      description: "Service {{ $labels.job }} has been down for more than 1 minute"
+      runbook_url: "https://docs.keiko.dev/runbooks/service-down"
+
+  # Performance Alerts
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~"keiko-.*"}[5m])) by (job, le)) > 1
+    for: 5m
+    labels:
+      severity: warning
+      service: "{{ $labels.job }}"
+    annotations:
+      summary: "High response time for {{ $labels.job }}"
+      description: "95th percentile response time is {{ $value }}s for service {{ $labels.job }}"
+
+  - alert: HighErrorRate
+    expr: sum(rate(http_requests_total{job=~"keiko-.*",status=~"5.."}[5m])) by (job) / sum(rate(http_requests_total{job=~"keiko-.*"}[5m])) by (job) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+      service: "{{ $labels.job }}"
+    annotations:
+      summary: "High error rate for {{ $labels.job }}"
+      description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+
+  # Resource Alerts
+  - alert: HighMemoryUsage
+    expr: process_resident_memory_bytes{job=~"keiko-.*"} / 1024 / 1024 > 500
+    for: 10m
+    labels:
+      severity: warning
+      service: "{{ $labels.job }}"
+    annotations:
+      summary: "High memory usage for {{ $labels.job }}"
+      description: "Memory usage is {{ $value }}MB for service {{ $labels.job }}"
+
+  - alert: HighCPUUsage
+    expr: rate(process_cpu_seconds_total{job=~"keiko-.*"}[5m]) * 100 > 80
+    for: 10m
+    labels:
+      severity: warning
+      service: "{{ $labels.job }}"
+    annotations:
+      summary: "High CPU usage for {{ $labels.job }}"
+      description: "CPU usage is {{ $value }}% for service {{ $labels.job }}"
+
+  # Agent-specific Alerts
+  - alert: AgentRegistrationFailure
+    expr: increase(keiko_agent_registration_failures_total[5m]) > 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High agent registration failure rate"
+      description: "{{ $value }} agent registration failures in the last 5 minutes"
+
+  - alert: NoActiveAgents
+    expr: keiko_agents_registered_total == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "No active agents registered"
+      description: "No agents are currently registered with the platform"
+
+  # Function Call Alerts
+  - alert: FunctionCallFailureRate
+    expr: sum(rate(keiko_function_calls_total{status="failed"}[5m])) / sum(rate(keiko_function_calls_total[5m])) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High function call failure rate"
+      description: "Function call failure rate is {{ $value | humanizePercentage }}"
+
+  # Database Alerts
+  - alert: DatabaseConnectionFailure
+    expr: keiko_database_connections_failed_total > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection failures detected"
+      description: "{{ $value }} database connection failures detected"
+
+  # Message Queue Alerts
+  - alert: MessageQueueLag
+    expr: keiko_message_queue_lag > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High message queue lag"
+      description: "Message queue lag is {{ $value }} messages"
+
+- name: keiko-sla-alerts
+  rules:
+  # SLA Alerts (99.9% uptime)
+  - alert: SLAViolation
+    expr: (sum(rate(http_requests_total{job=~"keiko-.*",status!~"5.."}[24h])) / sum(rate(http_requests_total{job=~"keiko-.*"}[24h]))) < 0.999
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "SLA violation detected"
+      description: "24h availability is {{ $value | humanizePercentage }}, below 99.9% SLA"
+
+  # Response Time SLA (95% < 500ms)
+  - alert: ResponseTimeSLAViolation
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~"keiko-.*"}[1h])) by (le)) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Response time SLA violation"
+      description: "95th percentile response time is {{ $value }}s, above 500ms SLA"

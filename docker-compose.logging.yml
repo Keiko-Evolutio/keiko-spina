@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: keiko-loki
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./infrastructure/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    restart: unless-stopped
+    networks:
+      - keiko-network
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: keiko-promtail
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./infrastructure/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - ./backend/logs:/app/backend-logs:ro
+    restart: unless-stopped
+    networks:
+      - keiko-network
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: keiko-grafana-logs
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-logs:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+networks:
+  keiko-network:
+    driver: bridge
+
+volumes:
+  loki-data:
+    driver: local
+  grafana-logs:
+    driver: local

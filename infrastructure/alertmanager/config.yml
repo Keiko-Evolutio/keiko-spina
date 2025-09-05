@@ -1,0 +1,47 @@
+route:
+  receiver: default
+  group_by: ["alertname", "severity", "tenant"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 2h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: critical
+      continue: true
+    - matchers:
+        - severity="warning"
+      receiver: warning
+      continue: true
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+    slack_configs:
+      - api_url: "${ALERT_SLACK_WEBHOOK_URL}"
+        channel: "${ALERT_SLACK_CHANNEL:-#keiko-alerts}"
+        send_resolved: true
+        text: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} | {{ .CommonLabels.severity }}"
+  - name: critical
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+    email_configs:
+      - to: "${ALERT_EMAIL_TO}"
+        from: "${ALERT_EMAIL_FROM}"
+        smarthost: "${ALERT_SMTP_HOST}:${ALERT_SMTP_PORT}"
+        auth_username: "${ALERT_SMTP_USER}"
+        auth_password: "${ALERT_SMTP_PASSWORD}"
+        require_tls: true
+        send_resolved: true
+  - name: warning
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts/alertmanager"
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: ["alertname", "tenant"]

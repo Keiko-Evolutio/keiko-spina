@@ -1,0 +1,305 @@
+# Edge Computing Makefile
+# Vereinfachte Commands für Edge-Infrastructure-Management
+
+.PHONY: help edge-build edge-up edge-down edge-logs edge-status edge-test edge-clean
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+COMPOSE_FILE := docker-compose.dev.yml
+ENV_FILE := .env.edge
+EDGE_SERVICES := edge-registry edge-node-1 edge-node-2 edge-node-3 edge-load-balancer edge-monitor
+PROJECT_NAME := keiko
+
+# Docker Compose mit Environment-Datei
+DOCKER_COMPOSE := docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
+
+# Colors for output
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+BLUE := \033[0;34m
+NC := \033[0m # No Color
+
+# =============================================================================
+# Help
+# =============================================================================
+
+help: ## Zeigt verfügbare Edge Computing-Commands
+	@echo "$(BLUE)Edge Computing Commands:$(NC)"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(BLUE)Beispiele:$(NC)"
+	@echo "  make edge-up          # Startet alle Edge-Services"
+	@echo "  make edge-logs        # Zeigt Logs aller Edge-Services"
+	@echo "  make edge-status      # Zeigt Status aller Edge-Services"
+	@echo "  make edge-test        # Führt Edge-Tests aus"
+
+# =============================================================================
+# Edge Infrastructure Management
+# =============================================================================
+
+edge-build: ## Baut alle Edge-Docker-Images
+	@echo "$(BLUE)Baue Edge-Docker-Images...$(NC)"
+	@echo "$(YELLOW)Verwende Environment-Datei: $(ENV_FILE)$(NC)"
+	$(DOCKER_COMPOSE) build $(EDGE_SERVICES)
+	@echo "$(GREEN)Edge-Images erfolgreich gebaut$(NC)"
+
+edge-up: ## Startet alle Edge-Services
+	@echo "$(BLUE)Starte Edge-Infrastructure...$(NC)"
+	@echo "$(YELLOW)Verwende Environment-Datei: $(ENV_FILE)$(NC)"
+	@if [ ! -f $(ENV_FILE) ]; then \
+		echo "$(YELLOW)Erstelle $(ENV_FILE) aus Vorlage...$(NC)"; \
+		cp .env.edge $(ENV_FILE); \
+	fi
+	@echo "$(YELLOW)Starte Abhängigkeiten...$(NC)"
+	$(DOCKER_COMPOSE) up -d postgres redis otel-collector prometheus alertmanager
+	@echo "$(YELLOW)Warte auf Abhängigkeiten...$(NC)"
+	sleep 10
+	@echo "$(YELLOW)Starte Edge-Services...$(NC)"
+	$(DOCKER_COMPOSE) up -d $(EDGE_SERVICES)
+	@echo "$(GREEN)Edge-Infrastructure gestartet$(NC)"
+	@echo ""
+	@echo "$(BLUE)Edge-Services verfügbar unter:$(NC)"
+	@echo "  Edge Registry:      http://localhost:8080"
+	@echo "  Edge Node 1:        http://localhost:8082"
+	@echo "  Edge Node 2:        http://localhost:8084"
+	@echo "  Edge Node 3:        http://localhost:8086"
+	@echo "  Load Balancer:      http://localhost:8088"
+	@echo "  Performance Monitor: http://localhost:8090"
+
+edge-down: ## Stoppt alle Edge-Services
+	@echo "$(BLUE)Stoppe Edge-Infrastructure...$(NC)"
+	$(DOCKER_COMPOSE) down $(EDGE_SERVICES)
+	@echo "$(GREEN)Edge-Infrastructure gestoppt$(NC)"
+
+edge-restart: ## Startet Edge-Services neu
+	@echo "$(BLUE)Starte Edge-Services neu...$(NC)"
+	make edge-down
+	sleep 2
+	make edge-up
+
+edge-logs: ## Zeigt Logs aller Edge-Services
+	@echo "$(BLUE)Edge-Service-Logs:$(NC)"
+	$(DOCKER_COMPOSE) logs -f $(EDGE_SERVICES)
+
+edge-logs-registry: ## Zeigt Logs der Edge Registry
+	@echo "$(BLUE)Edge Registry Logs:$(NC)"
+	docker-compose -f $(COMPOSE_FILE) logs -f edge-registry
+
+edge-logs-nodes: ## Zeigt Logs aller Edge-Nodes
+	@echo "$(BLUE)Edge Node Logs:$(NC)"
+	docker-compose -f $(COMPOSE_FILE) logs -f edge-node-1 edge-node-2 edge-node-3
+
+edge-logs-balancer: ## Zeigt Logs des Load Balancers
+	@echo "$(BLUE)Load Balancer Logs:$(NC)"
+	docker-compose -f $(COMPOSE_FILE) logs -f edge-load-balancer
+
+edge-logs-monitor: ## Zeigt Logs des Performance Monitors
+	@echo "$(BLUE)Performance Monitor Logs:$(NC)"
+	docker-compose -f $(COMPOSE_FILE) logs -f edge-monitor
+
+# =============================================================================
+# Edge Service Status
+# =============================================================================
+
+edge-status: ## Zeigt Status aller Edge-Services
+	@echo "$(BLUE)Edge-Service-Status:$(NC)"
+	@echo ""
+	@for service in $(EDGE_SERVICES); do \
+		echo "$(YELLOW)Checking $$service...$(NC)"; \
+		if docker-compose -f $(COMPOSE_FILE) ps $$service | grep -q "Up"; then \
+			echo "  $(GREEN)✓ $$service: Running$(NC)"; \
+		else \
+			echo "  $(RED)✗ $$service: Not running$(NC)"; \
+		fi; \
+	done
+	@echo ""
+
+edge-health: ## Führt Health Checks für alle Edge-Services aus
+	@echo "$(BLUE)Edge-Service Health Checks:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Edge Registry Health:$(NC)"
+	@curl -s http://localhost:8081/health | jq '.' || echo "$(RED)Registry nicht erreichbar$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Edge Node 1 Health:$(NC)"
+	@curl -s http://localhost:8083/health | jq '.' || echo "$(RED)Node 1 nicht erreichbar$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Edge Node 2 Health:$(NC)"
+	@curl -s http://localhost:8085/health | jq '.' || echo "$(RED)Node 2 nicht erreichbar$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Edge Node 3 Health:$(NC)"
+	@curl -s http://localhost:8087/health | jq '.' || echo "$(RED)Node 3 nicht erreichbar$(NC)"
+	@echo ""
+
+edge-ps: ## Zeigt laufende Edge-Container
+	@echo "$(BLUE)Laufende Edge-Container:$(NC)"
+	docker-compose -f $(COMPOSE_FILE) ps $(EDGE_SERVICES)
+
+# =============================================================================
+# Edge Development
+# =============================================================================
+
+edge-shell-registry: ## Öffnet Shell in Edge Registry Container
+	@echo "$(BLUE)Öffne Shell in Edge Registry...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-registry /bin/bash
+
+edge-shell-node1: ## Öffnet Shell in Edge Node 1 Container
+	@echo "$(BLUE)Öffne Shell in Edge Node 1...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-node-1 /bin/bash
+
+edge-shell-node2: ## Öffnet Shell in Edge Node 2 Container
+	@echo "$(BLUE)Öffne Shell in Edge Node 2...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-node-2 /bin/bash
+
+edge-shell-node3: ## Öffnet Shell in Edge Node 3 Container
+	@echo "$(BLUE)Öffne Shell in Edge Node 3...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-node-3 /bin/bash
+
+edge-shell-balancer: ## Öffnet Shell in Load Balancer Container
+	@echo "$(BLUE)Öffne Shell in Load Balancer...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-load-balancer /bin/bash
+
+edge-shell-monitor: ## Öffnet Shell in Performance Monitor Container
+	@echo "$(BLUE)Öffne Shell in Performance Monitor...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) exec edge-monitor /bin/bash
+
+# =============================================================================
+# Edge Testing
+# =============================================================================
+
+edge-test: ## Führt Edge Computing-Tests aus
+	@echo "$(BLUE)Führe Edge Computing-Tests aus...$(NC)"
+	@echo "$(YELLOW)Frontend Edge Tests:$(NC)"
+	npm test -- tests/edge/ || echo "$(RED)Frontend Edge Tests fehlgeschlagen$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Backend Edge Tests:$(NC)"
+	pytest tests/edge/ -v || echo "$(RED)Backend Edge Tests fehlgeschlagen$(NC)"
+	@echo ""
+	@echo "$(GREEN)Edge Tests abgeschlossen$(NC)"
+
+edge-test-performance: ## Führt Edge Performance-Tests aus
+	@echo "$(BLUE)Führe Edge Performance-Tests aus...$(NC)"
+	npm run test:performance -- edge-latency edge-throughput edge-cache
+	@echo "$(GREEN)Performance-Tests abgeschlossen$(NC)"
+
+edge-test-integration: ## Führt Edge Integration-Tests aus
+	@echo "$(BLUE)Führe Edge Integration-Tests aus...$(NC)"
+	pytest tests/edge/test_integration.py -v
+	@echo "$(GREEN)Integration-Tests abgeschlossen$(NC)"
+
+edge-benchmark: ## Führt Edge Performance-Benchmarks aus
+	@echo "$(BLUE)Führe Edge Performance-Benchmarks aus...$(NC)"
+	@echo "$(YELLOW)WASM vs JavaScript Performance:$(NC)"
+	npm run benchmark -- edge-wasm-performance
+	@echo ""
+	@echo "$(YELLOW)Edge Node Latenz-Benchmark:$(NC)"
+	npm run benchmark -- edge-node-latency
+	@echo ""
+	@echo "$(YELLOW)Cache Performance-Benchmark:$(NC)"
+	npm run benchmark -- edge-cache-performance
+	@echo "$(GREEN)Benchmarks abgeschlossen$(NC)"
+
+# =============================================================================
+# Edge Monitoring
+# =============================================================================
+
+edge-metrics: ## Zeigt Edge Performance-Metriken
+	@echo "$(BLUE)Edge Performance-Metriken:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Registry Metriken:$(NC)"
+	@curl -s http://localhost:8080/api/v1/metrics | jq '.' || echo "$(RED)Registry Metriken nicht verfügbar$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Load Balancer Metriken:$(NC)"
+	@curl -s http://localhost:8088/api/v1/metrics | jq '.' || echo "$(RED)Load Balancer Metriken nicht verfügbar$(NC)"
+	@echo ""
+
+edge-prometheus: ## Öffnet Prometheus für Edge-Metriken
+	@echo "$(BLUE)Öffne Prometheus für Edge-Metriken...$(NC)"
+	@echo "Prometheus verfügbar unter: http://localhost:9090"
+	@echo "Edge-Metriken-Queries:"
+	@echo "  - edge_node_latency_seconds"
+	@echo "  - edge_task_duration_seconds"
+	@echo "  - edge_cache_hit_rate"
+	@echo "  - edge_node_cpu_usage"
+
+edge-grafana: ## Öffnet Grafana für Edge-Dashboards
+	@echo "$(BLUE)Öffne Grafana für Edge-Dashboards...$(NC)"
+	@echo "Grafana verfügbar unter: http://localhost:3001"
+	@echo "Login: admin/admin"
+	@echo "Edge-Dashboards:"
+	@echo "  - Edge Computing Overview"
+	@echo "  - Edge Node Performance"
+	@echo "  - Edge Load Balancing"
+
+# =============================================================================
+# Edge Cleanup
+# =============================================================================
+
+edge-clean: ## Bereinigt Edge-Container und -Volumes
+	@echo "$(BLUE)Bereinige Edge-Infrastructure...$(NC)"
+	docker-compose -f $(COMPOSE_FILE) down $(EDGE_SERVICES) -v
+	docker-compose -f $(COMPOSE_FILE) rm -f $(EDGE_SERVICES)
+	@echo "$(YELLOW)Entferne Edge-Images...$(NC)"
+	docker images | grep keiko/edge | awk '{print $$3}' | xargs -r docker rmi -f
+	@echo "$(YELLOW)Entferne Edge-Volumes...$(NC)"
+	docker volume ls | grep edge-node | awk '{print $$2}' | xargs -r docker volume rm
+	@echo "$(GREEN)Edge-Cleanup abgeschlossen$(NC)"
+
+edge-reset: ## Vollständiger Reset der Edge-Infrastructure
+	@echo "$(BLUE)Vollständiger Reset der Edge-Infrastructure...$(NC)"
+	make edge-clean
+	make edge-build
+	make edge-up
+	@echo "$(GREEN)Edge-Infrastructure zurückgesetzt$(NC)"
+
+# =============================================================================
+# Edge Configuration
+# =============================================================================
+
+edge-config: ## Zeigt aktuelle Edge-Konfiguration
+	@echo "$(BLUE)Edge-Konfiguration:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Edge Registry Konfiguration:$(NC)"
+	@cat docker/edge/config/edge-registry.yml | head -20
+	@echo ""
+	@echo "$(YELLOW)Edge Node Konfiguration:$(NC)"
+	@cat docker/edge/config/edge-node.yml | head -20
+	@echo ""
+	@echo "$(BLUE)Für vollständige Konfiguration siehe:$(NC)"
+	@echo "  - docker/edge/config/edge-registry.yml"
+	@echo "  - docker/edge/config/edge-node.yml"
+
+edge-env: ## Zeigt Edge-Umgebungsvariablen
+	@echo "$(BLUE)Edge-Umgebungsvariablen:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Registry:$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec edge-registry env | grep -E "^(EDGE|NODE|REGISTRY)" || true
+	@echo ""
+	@echo "$(YELLOW)Node 1:$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec edge-node-1 env | grep -E "^(EDGE|NODE|REGISTRY)" || true
+
+# =============================================================================
+# Edge Documentation
+# =============================================================================
+
+edge-docs: ## Öffnet Edge Computing-Dokumentation
+	@echo "$(BLUE)Edge Computing-Dokumentation:$(NC)"
+	@echo ""
+	@echo "Verfügbare Dokumentation:"
+	@echo "  - docs/EDGE_COMPUTING_INTEGRATION.md"
+	@echo "  - frontend/src/edge/README.md"
+	@echo "  - backend/edge/README.md"
+	@echo ""
+	@echo "API-Dokumentation:"
+	@echo "  - Edge Registry API: http://localhost:8080/docs"
+	@echo "  - Edge Node API: http://localhost:8082/docs"
+	@echo "  - Load Balancer API: http://localhost:8088/docs"
+
+# =============================================================================
+# Default Target
+# =============================================================================
+
+.DEFAULT_GOAL := help

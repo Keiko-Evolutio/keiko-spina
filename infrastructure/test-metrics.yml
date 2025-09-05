@@ -1,0 +1,216 @@
+# Test Metrics Configuration for Keiko Personal Assistant
+# Konfiguration für Test-Metriken und Monitoring nach Teststruktur-Migration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-metrics-config
+  namespace: keiko-monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      - "test_alerts.yml"
+
+    scrape_configs:
+      # GitHub Actions Test Metrics
+      - job_name: 'github-actions-tests'
+        static_configs:
+          - targets: ['github-actions-exporter:8080']
+        metrics_path: /metrics
+        scrape_interval: 30s
+        params:
+          repo: ['oscharko/keiko-personal-assistant']
+
+      # Test Coverage Metrics
+      - job_name: 'test-coverage'
+        static_configs:
+          - targets: ['coverage-exporter:8081']
+        metrics_path: /metrics
+        scrape_interval: 60s
+
+      # Test Performance Metrics
+      - job_name: 'test-performance'
+        static_configs:
+          - targets: ['performance-exporter:8082']
+        metrics_path: /metrics
+        scrape_interval: 300s
+
+  test_alerts.yml: |
+    groups:
+      - name: test_alerts
+        rules:
+          # Unit Test Alerts
+          - alert: UnitTestFailureRate
+            expr: (github_actions_test_failures{category="unit"} / github_actions_test_total{category="unit"}) > 0.05
+            for: 5m
+            labels:
+              severity: warning
+              category: unit
+            annotations:
+              summary: "Unit test failure rate is high"
+              description: "Unit test failure rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+          - alert: UnitTestDuration
+            expr: github_actions_test_duration{category="unit"} > 60
+            for: 2m
+            labels:
+              severity: warning
+              category: unit
+            annotations:
+              summary: "Unit tests taking too long"
+              description: "Unit tests are taking {{ $value }}s, which exceeds the 60s threshold"
+
+          # Integration Test Alerts
+          - alert: IntegrationTestFailureRate
+            expr: (github_actions_test_failures{category="integration"} / github_actions_test_total{category="integration"}) > 0.10
+            for: 5m
+            labels:
+              severity: warning
+              category: integration
+            annotations:
+              summary: "Integration test failure rate is high"
+              description: "Integration test failure rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+          - alert: IntegrationTestDuration
+            expr: github_actions_test_duration{category="integration"} > 300
+            for: 2m
+            labels:
+              severity: warning
+              category: integration
+            annotations:
+              summary: "Integration tests taking too long"
+              description: "Integration tests are taking {{ $value }}s, which exceeds the 300s threshold"
+
+          # E2E Test Alerts
+          - alert: E2ETestFailureRate
+            expr: (github_actions_test_failures{category="e2e"} / github_actions_test_total{category="e2e"}) > 0.15
+            for: 10m
+            labels:
+              severity: critical
+              category: e2e
+            annotations:
+              summary: "E2E test failure rate is critical"
+              description: "E2E test failure rate is {{ $value | humanizePercentage }} for the last 10 minutes"
+
+          - alert: E2ETestDuration
+            expr: github_actions_test_duration{category="e2e"} > 600
+            for: 5m
+            labels:
+              severity: warning
+              category: e2e
+            annotations:
+              summary: "E2E tests taking too long"
+              description: "E2E tests are taking {{ $value }}s, which exceeds the 600s threshold"
+
+          # Conformance Test Alerts
+          - alert: ConformanceTestFailure
+            expr: github_actions_test_failures{category="conformance"} > 0
+            for: 1m
+            labels:
+              severity: critical
+              category: conformance
+            annotations:
+              summary: "Conformance tests are failing"
+              description: "{{ $value }} conformance tests are failing - protocol compliance may be broken"
+
+          # Security Test Alerts
+          - alert: SecurityTestFailure
+            expr: github_actions_test_failures{category="security"} > 0
+            for: 1m
+            labels:
+              severity: critical
+              category: security
+            annotations:
+              summary: "Security tests are failing"
+              description: "{{ $value }} security tests are failing - security vulnerabilities may exist"
+
+          # Coverage Alerts
+          - alert: CoverageBelowThreshold
+            expr: test_coverage_percentage{category="unit"} < 85
+            for: 5m
+            labels:
+              severity: warning
+              category: coverage
+            annotations:
+              summary: "Test coverage below threshold"
+              description: "Unit test coverage is {{ $value }}%, below the 85% threshold"
+
+          - alert: CoverageDropped
+            expr: (test_coverage_percentage{category="unit"} - test_coverage_percentage{category="unit"} offset 1h) < -5
+            for: 5m
+            labels:
+              severity: warning
+              category: coverage
+            annotations:
+              summary: "Test coverage dropped significantly"
+              description: "Unit test coverage dropped by {{ $value }}% in the last hour"
+
+          # Performance Test Alerts
+          - alert: PerformanceRegression
+            expr: increase(test_performance_latency_p95[1h]) > 50
+            for: 10m
+            labels:
+              severity: warning
+              category: performance
+            annotations:
+              summary: "Performance regression detected"
+              description: "P95 latency increased by {{ $value }}ms in the last hour"
+
+          # CI/CD Pipeline Alerts
+          - alert: TestPipelineFailure
+            expr: github_actions_workflow_status{workflow="ci"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              category: pipeline
+            annotations:
+              summary: "CI test pipeline is failing"
+              description: "The main CI test pipeline has been failing for more than 1 minute"
+
+  slack_notifications.yml: |
+    # Slack Webhook Configuration für Test-Alerts
+    webhook_configs:
+      - url: '${SLACK_WEBHOOK_URL}'
+        channel: '#keiko-alerts'
+        title: 'Keiko Test Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Category:* {{ .Labels.category }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+
+  test_quality_metrics.yml: |
+    # Test Quality Metrics Configuration
+    quality_metrics:
+      unit_tests:
+        target_coverage: 85
+        max_duration_seconds: 60
+        max_failure_rate: 0.05
+
+      integration_tests:
+        target_coverage: 70
+        max_duration_seconds: 300
+        max_failure_rate: 0.10
+
+      e2e_tests:
+        max_duration_seconds: 600
+        max_failure_rate: 0.15
+
+      conformance_tests:
+        max_failure_rate: 0.0
+        critical_alert: true
+
+      security_tests:
+        max_failure_rate: 0.0
+        critical_alert: true
+
+      performance_tests:
+        p95_latency_threshold_ms: 200
+        p99_latency_threshold_ms: 500
+        min_throughput_rps: 100

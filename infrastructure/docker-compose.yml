@@ -1,0 +1,57 @@
+# Docker Compose für Infrastruktur-Komponenten von Keiko
+# - NGINX Reverse Proxy (oder alternativ HAProxy)
+# - Redis (Rate Limiting / DDoS)
+# - Gemeinsames Netzwerk
+
+version: "3.9"
+
+services:
+  nginx:
+    image: openresty/openresty:alpine
+    container_name: keiko-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ../frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - redis
+    networks:
+      - keiko-net
+    restart: unless-stopped
+
+  haproxy:
+    image: haproxy:2.9
+    container_name: keiko-haproxy
+    ports:
+      - "8443:443"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs:/etc/haproxy/certs:ro
+    networks:
+      - keiko-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: keiko-redis-infra
+    command: [ "redis-server", "/etc/redis/redis.conf" ]
+    volumes:
+      - ./redis/redis.conf:/etc/redis/redis.conf:ro
+      - redis-data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - keiko-net
+    restart: unless-stopped
+
+networks:
+  keiko-net:
+    name: keiko-net
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

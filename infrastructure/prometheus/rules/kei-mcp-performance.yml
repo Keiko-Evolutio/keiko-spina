@@ -1,0 +1,379 @@
+# ============================================================================
+# KEI-MCP API PERFORMANCE ALERTING RULES
+# ============================================================================
+
+groups:
+  # ==========================================================================
+  # SLA LATENCY ALERTS
+  # ==========================================================================
+  - name: kei-mcp-sla-latency
+    rules:
+      # Tool Invocation Latency Alerts
+      - alert: ToolInvocationLatencyWarning
+        expr: histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m])) > 0.16
+        for: 2m
+        labels:
+          severity: warning
+          component: tool-invocation
+          sla: latency
+        annotations:
+          summary: "Tool invocation P95 latency approaching SLA limit"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 200ms, Warning: 160ms)"
+          runbook_url: "https://docs.keiko-assistant.com/runbooks/performance/tool-invocation-latency"
+
+      - alert: ToolInvocationLatencyCritical
+        expr: histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m])) > 0.2
+        for: 1m
+        labels:
+          severity: critical
+          component: tool-invocation
+          sla: latency
+        annotations:
+          summary: "Tool invocation P95 latency exceeds SLA"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 200ms)"
+          runbook_url: "https://docs.keiko-assistant.com/runbooks/performance/tool-invocation-latency"
+
+      - alert: ToolInvocationLatencyEmergency
+        expr: histogram_quantile(0.99, rate(kei_mcp_tool_duration_seconds_bucket[5m])) > 1.0
+        for: 30s
+        labels:
+          severity: emergency
+          component: tool-invocation
+          sla: latency
+        annotations:
+          summary: "Tool invocation P99 latency critically high"
+          description: "P99 latency is {{ $value | humanizeDuration }} (SLA P99: 500ms)"
+          runbook_url: "https://docs.keiko-assistant.com/runbooks/performance/tool-invocation-latency"
+
+      # Resource Access Latency Alerts
+      - alert: ResourceAccessLatencyWarning
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*resources.*"}[5m])) > 0.08
+        for: 2m
+        labels:
+          severity: warning
+          component: resource-access
+          sla: latency
+        annotations:
+          summary: "Resource access P95 latency approaching SLA limit"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 100ms, Warning: 80ms)"
+
+      - alert: ResourceAccessLatencyCritical
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*resources.*"}[5m])) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          component: resource-access
+          sla: latency
+        annotations:
+          summary: "Resource access P95 latency exceeds SLA"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 100ms)"
+
+      # Tool Discovery Latency Alerts
+      - alert: ToolDiscoveryLatencyWarning
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*tools.*",method="GET"}[5m])) > 0.12
+        for: 2m
+        labels:
+          severity: warning
+          component: tool-discovery
+          sla: latency
+        annotations:
+          summary: "Tool discovery P95 latency approaching SLA limit"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 150ms, Warning: 120ms)"
+
+      - alert: ToolDiscoveryLatencyCritical
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*tools.*",method="GET"}[5m])) > 0.15
+        for: 1m
+        labels:
+          severity: critical
+          component: tool-discovery
+          sla: latency
+        annotations:
+          summary: "Tool discovery P95 latency exceeds SLA"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 150ms)"
+
+      # Server Registration Latency Alerts
+      - alert: ServerRegistrationLatencyWarning
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*servers/register.*"}[5m])) > 0.24
+        for: 2m
+        labels:
+          severity: warning
+          component: server-registration
+          sla: latency
+        annotations:
+          summary: "Server registration P95 latency approaching SLA limit"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 300ms, Warning: 240ms)"
+
+      - alert: ServerRegistrationLatencyCritical
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~".*servers/register.*"}[5m])) > 0.3
+        for: 1m
+        labels:
+          severity: critical
+          component: server-registration
+          sla: latency
+        annotations:
+          summary: "Server registration P95 latency exceeds SLA"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 300ms)"
+
+  # ==========================================================================
+  # SLA THROUGHPUT ALERTS
+  # ==========================================================================
+  - name: kei-mcp-sla-throughput
+    rules:
+      # Overall Throughput Alerts
+      - alert: LowThroughputWarning
+        expr: rate(http_requests_total[5m]) < 400
+        for: 3m
+        labels:
+          severity: warning
+          component: api
+          sla: throughput
+        annotations:
+          summary: "API throughput below warning threshold"
+          description: "Current RPS: {{ $value | humanize }} (Minimum SLA: 500 req/s, Warning: 400 req/s)"
+
+      - alert: LowThroughputCritical
+        expr: rate(http_requests_total[5m]) < 250
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+          sla: throughput
+        annotations:
+          summary: "API throughput critically low"
+          description: "Current RPS: {{ $value | humanize }} (Minimum SLA: 500 req/s)"
+
+      # Tool Invocation Throughput
+      - alert: ToolInvocationThroughputLow
+        expr: rate(kei_mcp_tool_invocations_total[5m]) < 200
+        for: 3m
+        labels:
+          severity: warning
+          component: tool-invocation
+          sla: throughput
+        annotations:
+          summary: "Tool invocation throughput low"
+          description: "Current tool invocation RPS: {{ $value | humanize }} (Target: 500+ req/s)"
+
+      # Resource Access Throughput
+      - alert: ResourceAccessThroughputLow
+        expr: rate(http_requests_total{endpoint=~".*resources.*"}[5m]) < 800
+        for: 3m
+        labels:
+          severity: warning
+          component: resource-access
+          sla: throughput
+        annotations:
+          summary: "Resource access throughput low"
+          description: "Current resource access RPS: {{ $value | humanize }} (Target: 1000+ req/s)"
+
+  # ==========================================================================
+  # ERROR RATE ALERTS
+  # ==========================================================================
+  - name: kei-mcp-error-rates
+    rules:
+      # High Error Rate Alerts
+      - alert: HighErrorRateWarning
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: api
+          sla: availability
+        annotations:
+          summary: "High 5xx error rate detected"
+          description: "5xx error rate: {{ $value | humanizePercentage }} (Warning: 1%)"
+
+      - alert: HighErrorRateCritical
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+          sla: availability
+        annotations:
+          summary: "Critical 5xx error rate"
+          description: "5xx error rate: {{ $value | humanizePercentage }} (Critical: 5%)"
+
+      # Tool Validation Error Rate
+      - alert: HighToolValidationErrorRate
+        expr: rate(kei_mcp_tool_validation_failures_total[5m]) / rate(kei_mcp_tool_invocations_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          component: tool-validation
+          sla: quality
+        annotations:
+          summary: "High tool validation error rate"
+          description: "Tool validation error rate: {{ $value | humanizePercentage }} (Warning: 10%)"
+
+      # Circuit Breaker Alerts
+      - alert: CircuitBreakerOpen
+        expr: kei_mcp_circuit_breaker_state == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: circuit-breaker
+          sla: availability
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.server_name }}"
+          description: "Circuit breaker for server {{ $labels.server_name }} has been open for more than 1 minute"
+
+      - alert: CircuitBreakerHalfOpen
+        expr: kei_mcp_circuit_breaker_state == 2
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit-breaker
+          sla: availability
+        annotations:
+          summary: "Circuit breaker half-open for {{ $labels.server_name }}"
+          description: "Circuit breaker for server {{ $labels.server_name }} has been half-open for more than 5 minutes"
+
+  # ==========================================================================
+  # RESOURCE UTILIZATION ALERTS
+  # ==========================================================================
+  - name: kei-mcp-resource-utilization
+    rules:
+      # CPU Utilization Alerts
+      - alert: HighCPUUsageWarning
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 70
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          resource: cpu
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage: {{ $value | humanize }}% (Warning: 70%)"
+
+      - alert: HighCPUUsageCritical
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          resource: cpu
+        annotations:
+          summary: "Critical CPU usage"
+          description: "CPU usage: {{ $value | humanize }}% (Critical: 90%)"
+
+      # Memory Utilization Alerts
+      - alert: HighMemoryUsageWarning
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 6
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          resource: memory
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage: {{ $value | humanize }}GB (Warning: 6GB)"
+
+      - alert: HighMemoryUsageCritical
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 7.5
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          resource: memory
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage: {{ $value | humanize }}GB (Critical: 7.5GB)"
+
+      # Connection Pool Alerts
+      - alert: ConnectionPoolExhaustion
+        expr: kei_mcp_connection_pool_active / kei_mcp_connection_pool_max > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          component: connection-pool
+          resource: connections
+        annotations:
+          summary: "Connection pool near exhaustion"
+          description: "Active connections: {{ $value | humanizePercentage }} of maximum"
+
+  # ==========================================================================
+  # PERFORMANCE REGRESSION ALERTS
+  # ==========================================================================
+  - name: kei-mcp-performance-regression
+    rules:
+      # Latency Regression Detection
+      - alert: LatencyRegressionDetected
+        expr: |
+          (
+            histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m])) -
+            histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m] offset 24h))
+          ) / histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m] offset 24h)) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+          type: regression
+        annotations:
+          summary: "Performance regression detected in tool invocation latency"
+          description: "P95 latency has increased by {{ $value | humanizePercentage }} compared to 24h ago"
+
+      # Throughput Regression Detection
+      - alert: ThroughputRegressionDetected
+        expr: |
+          (
+            rate(http_requests_total[5m] offset 24h) -
+            rate(http_requests_total[5m])
+          ) / rate(http_requests_total[5m] offset 24h) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+          type: regression
+        annotations:
+          summary: "Performance regression detected in request throughput"
+          description: "Request throughput has decreased by {{ $value | humanizePercentage }} compared to 24h ago"
+
+  # ==========================================================================
+  # AVAILABILITY ALERTS
+  # ==========================================================================
+  - name: kei-mcp-availability
+    rules:
+      # Service Down Alert
+      - alert: ServiceDown
+        expr: up{job="kei-mcp-api"} == 0
+        for: 1m
+        labels:
+          severity: emergency
+          component: api
+          sla: availability
+        annotations:
+          summary: "KEI-MCP API service is down"
+          description: "Service {{ $labels.instance }} has been down for more than 1 minute"
+
+      # Health Check Failure
+      - alert: HealthCheckFailure
+        expr: kei_mcp_health_check_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: health-check
+          sla: availability
+        annotations:
+          summary: "Health check failure for {{ $labels.check_name }}"
+          description: "Health check {{ $labels.check_name }} has been failing for more than 2 minutes"
+
+      # SLA Availability Calculation
+      - record: kei_mcp_availability_sla
+        expr: |
+          (
+            sum(rate(http_requests_total{status!~"5.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) * 100
+
+      # SLA Violation Alert
+      - alert: SLAAvailabilityViolation
+        expr: kei_mcp_availability_sla < 99.9
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+          sla: availability
+        annotations:
+          summary: "SLA availability violation"
+          description: "Current availability: {{ $value | humanizePercentage }} (SLA: 99.9%)"

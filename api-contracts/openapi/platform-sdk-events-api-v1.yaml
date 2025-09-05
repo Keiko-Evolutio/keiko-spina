@@ -1,0 +1,395 @@
+openapi: 3.0.3
+info:
+  title: Keiko Platform-SDK Events API
+  description: |
+    **Architektur-konforme API für Event-Kommunikation zwischen Platform und SDK**
+
+    Diese API gewährleistet strikte Unabhängigkeit zwischen Platform und SDK durch:
+    - Versionierte HTTP/REST Endpoints
+    - Schema-validierte Event-Strukturen
+    - Backward-kompatible API-Evolution
+    - Keine direkten Messaging-Dependencies
+
+    **Compliance:** Ersetzt direkte Messaging-Kommunikation aus Issue #56 durch API-first Ansatz.
+  version: 1.0.0
+  contact:
+    name: Keiko Architecture Team
+    email: architecture@keiko.dev
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://platform-api.keiko.dev/v1
+    description: Production Platform API
+  - url: https://staging-platform-api.keiko.dev/v1
+    description: Staging Platform API
+  - url: http://localhost:8000/v1
+    description: Local Development
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  /events/agent:
+    post:
+      summary: Publish Agent Event
+      description: |
+        SDK publiziert Agent-Events über HTTP API statt direkter Messaging-Kommunikation.
+        Platform verarbeitet Events intern mit eigenem Messaging-System.
+      operationId: publishAgentEvent
+      tags:
+        - Agent Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentEventRequest'
+            examples:
+              agent_created:
+                summary: Agent Created Event
+                value:
+                  event_type: "agent.created"
+                  agent_id: "agent_123"
+                  agent_type: "code_assistant"
+                  capabilities: ["code_generation", "debugging", "testing"]
+                  metadata:
+                    created_by: "user_456"
+                    environment: "production"
+              agent_updated:
+                summary: Agent Updated Event
+                value:
+                  event_type: "agent.updated"
+                  agent_id: "agent_123"
+                  capabilities: ["code_generation", "debugging", "testing", "documentation"]
+                  metadata:
+                    updated_by: "user_456"
+                    version: "1.2.0"
+      responses:
+        '201':
+          description: Event successfully published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          description: Invalid event data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/agent/{agent_id}/stream:
+    get:
+      summary: Stream Agent Events (Server-Sent Events)
+      description: |
+        Real-time Event-Stream für Agent-Updates via Server-Sent Events.
+        Ersetzt direkte Messaging-Subscriptions durch HTTP-basierte Streaming.
+      operationId: streamAgentEvents
+      tags:
+        - Agent Events
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+          example: "agent_123"
+        - name: event_types
+          in: query
+          description: Filter für spezifische Event-Typen
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          example: ["agent.updated", "agent.status_changed"]
+      responses:
+        '200':
+          description: Event stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                format: binary
+              examples:
+                event_stream:
+                  summary: Server-Sent Events Stream
+                  value: |
+                    data: {"event_id": "evt_789", "event_type": "agent.updated", "agent_id": "agent_123", "timestamp": "2025-08-31T10:00:00Z"}
+                    
+                    data: {"event_id": "evt_790", "event_type": "agent.status_changed", "agent_id": "agent_123", "status": "active", "timestamp": "2025-08-31T10:01:00Z"}
+
+  /events/task:
+    post:
+      summary: Publish Task Event
+      description: SDK publiziert Task-Events über HTTP API
+      operationId: publishTaskEvent
+      tags:
+        - Task Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskEventRequest'
+      responses:
+        '201':
+          description: Event successfully published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+
+  /events/workflow:
+    post:
+      summary: Publish Workflow Event
+      description: SDK publiziert Workflow-Events über HTTP API
+      operationId: publishWorkflowEvent
+      tags:
+        - Workflow Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowEventRequest'
+      responses:
+        '201':
+          description: Event successfully published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+
+  /health:
+    get:
+      summary: API Health Check
+      description: Überprüft API-Verfügbarkeit und Platform-Connectivity
+      operationId: healthCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AgentEventRequest:
+      type: object
+      required:
+        - event_type
+        - agent_id
+      properties:
+        event_type:
+          type: string
+          enum:
+            - "agent.created"
+            - "agent.updated"
+            - "agent.deleted"
+            - "agent.status_changed"
+          description: Typ des Agent-Events
+        agent_id:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+          description: Eindeutige Agent-ID
+        agent_type:
+          type: string
+          enum:
+            - "code_assistant"
+            - "data_analyst"
+            - "workflow_manager"
+            - "monitoring_agent"
+          description: Typ des Agents
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Agent-Fähigkeiten
+          example: ["code_generation", "debugging", "testing"]
+        status:
+          type: string
+          enum:
+            - "active"
+            - "inactive"
+            - "error"
+            - "maintenance"
+          description: Agent-Status (für status_changed Events)
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Zusätzliche Event-Metadaten
+          example:
+            created_by: "user_456"
+            environment: "production"
+            version: "1.0.0"
+
+    TaskEventRequest:
+      type: object
+      required:
+        - event_type
+        - task_id
+      properties:
+        event_type:
+          type: string
+          enum:
+            - "task.created"
+            - "task.assigned"
+            - "task.completed"
+            - "task.failed"
+        task_id:
+          type: string
+          pattern: '^task_[a-zA-Z0-9_]+$'
+        agent_id:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+        task_type:
+          type: string
+        priority:
+          type: string
+          enum: ["low", "medium", "high", "critical"]
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    WorkflowEventRequest:
+      type: object
+      required:
+        - event_type
+        - workflow_id
+      properties:
+        event_type:
+          type: string
+          enum:
+            - "workflow.started"
+            - "workflow.completed"
+            - "workflow.failed"
+            - "workflow.cancelled"
+        workflow_id:
+          type: string
+          pattern: '^workflow_[a-zA-Z0-9_]+$'
+        plan_id:
+          type: string
+        status:
+          type: string
+          enum: ["running", "completed", "failed", "cancelled"]
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    EventResponse:
+      type: object
+      required:
+        - event_id
+        - status
+        - timestamp
+      properties:
+        event_id:
+          type: string
+          description: Eindeutige Event-ID
+          example: "evt_789abc123"
+        status:
+          type: string
+          enum: ["published", "queued", "processing"]
+          description: Event-Verarbeitungsstatus
+        timestamp:
+          type: string
+          format: date-time
+          description: Event-Publikationszeitpunkt
+        api_version:
+          type: string
+          description: Verwendete API-Version
+          example: "v1"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error-Code
+          example: "INVALID_EVENT_DATA"
+        message:
+          type: string
+          description: Human-readable Error-Message
+          example: "Agent ID must match pattern '^agent_[a-zA-Z0-9_]+$'"
+        details:
+          type: object
+          description: Zusätzliche Error-Details
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "degraded", "unhealthy"]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "v1.0.0"
+        platform_connectivity:
+          type: string
+          enum: ["connected", "disconnected", "degraded"]
+        metrics:
+          type: object
+          properties:
+            uptime_seconds:
+              type: integer
+            requests_per_minute:
+              type: integer
+            error_rate_percent:
+              type: number
+
+tags:
+  - name: Agent Events
+    description: Agent-bezogene Event-Operationen
+  - name: Task Events
+    description: Task-bezogene Event-Operationen
+  - name: Workflow Events
+    description: Workflow-bezogene Event-Operationen
+  - name: System
+    description: System- und Health-Check Operationen

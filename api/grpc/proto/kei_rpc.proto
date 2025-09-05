@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package api.grpc.v1;
+
+option go_package = "github.com/keiko-platform/api-grpc/gen/go/api/grpc/v1;apigrpcv1";
+option java_multiple_files = true;
+option java_package = "com.keiko.api.grpc.v1";
+option csharp_namespace = "Keiko.Api.Grpc.V1";
+
+// KEI-RPC gRPC Service v1
+// Bidi-Streaming für Long-Running/Realtime Tasks, einfache RPCs für CRUD/Actions.
+
+message Pagination {
+  int32 page = 1;
+  int32 per_page = 2;
+  int32 total = 3;
+}
+
+message Resource {
+  string id = 1;
+  string name = 2;
+  string created_at = 3; // RFC3339
+  string updated_at = 4; // RFC3339
+}
+
+message ListResourcesRequest {
+  int32 page = 1;
+  int32 per_page = 2;
+  string q = 3; // filter contains
+  string sort = 4; // e.g. -updated_at
+}
+
+message ListResourcesResponse {
+  repeated Resource items = 1;
+  Pagination pagination = 2;
+}
+
+message CreateResourceRequest {
+  string name = 1;
+  string idempotency_key = 2;
+}
+
+message GetResourceRequest { string id = 1; }
+
+message PatchResourceRequest {
+  string id = 1;
+  string name = 2; // optional
+  string if_match = 3; // ETag
+}
+
+message BatchCreateRequest { repeated CreateResourceRequest items = 1; }
+
+service KEIRPCService {
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse) {}
+  rpc CreateResource(CreateResourceRequest) returns (Resource) {}
+  rpc GetResource(GetResourceRequest) returns (Resource) {}
+  rpc PatchResource(PatchResourceRequest) returns (Resource) {}
+  rpc BatchCreate(BatchCreateRequest) returns (ListResourcesResponse) {}
+
+  // Bidi stream für Long-running/Realtime Aufgaben
+  rpc StreamOperations(stream StreamMessage) returns (stream StreamMessage) {}
+
+  // ==============================
+  // Agent Operations (KEI-RPC v1)
+  // ==============================
+  rpc Plan(PlanRequest) returns (OperationResponse) {}
+  rpc Act(ActRequest) returns (OperationResponse) {}
+  rpc Observe(ObserveRequest) returns (OperationResponse) {}
+  rpc Explain(ExplainRequest) returns (OperationResponse) {}
+}
+
+message StreamMessage {
+  string id = 1;
+  string type = 2; // request|status|result|error
+  string operation = 3; // z.B. tool.invoke
+  string payload_json = 4;
+}
+
+// ==============================
+// Agent Operations Messages
+// ==============================
+
+message PlanRequest {
+  string objective = 1;           // Zielbeschreibung
+  string context_json = 2;        // Optionaler Kontext als JSON-String
+}
+
+message ActRequest {
+  string action = 1;              // Beschreibung der Aktion
+  string context_json = 2;        // Optionaler Kontext als JSON-String
+}
+
+message ObserveRequest {
+  string observation = 1;         // Beobachtungstext
+  string context_json = 2;        // Optionaler Kontext als JSON-String
+}
+
+message ExplainRequest {
+  string topic = 1;               // Thema der Erklärung
+  string context_json = 2;        // Optionaler Kontext als JSON-String
+}
+
+message OperationResponse {
+  string operation = 1;           // plan|act|observe|explain
+  string status = 2;              // success|error
+  string started_at = 3;          // RFC3339
+  string completed_at = 4;        // RFC3339
+  string result_json = 5;         // Ergebnis als JSON-String
+  string error = 6;               // Fehlermeldung
+}

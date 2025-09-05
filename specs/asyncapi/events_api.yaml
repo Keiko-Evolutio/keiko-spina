@@ -1,0 +1,365 @@
+# specs/asyncapi/events_api.yaml
+asyncapi: 3.0.0
+
+info:
+  title: KEI-Agent-Framework Events API
+  version: 1.0.0
+  description: |
+    Event-Streaming und Message-Bus-API für das Keiko Personal Assistant
+
+    **Event-Kategorien:**
+    - Agent-Lifecycle-Events (Registrierung, Updates, Deprecation)
+    - Health-Events (Gesundheitsstatus, Performance-Metriken)
+    - Rollout-Events (Deployment-Status, Rollback-Trigger)
+    - Discovery-Events (Agent-Discovery, Load-Balancing)
+    - Tenant-Events (Tenant-Management, Quota-Überschreitungen)
+    - Security-Events (Authentifizierung, Autorisierung)
+
+  contact:
+    name: KEI-Agent-Framework Development Team
+    email: dev@Keiko Personal Assistantcom
+    url: https://github.com/kei-agent-framework
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  websocket_server:
+    host: localhost:8000
+    protocol: ws
+    description: WebSocket-Server für Real-time-Events
+    bindings:
+      ws:
+        bindingVersion: 0.1.0
+    security:
+      - bearerAuth: []
+
+  sse_server:
+    host: localhost:8000
+    protocol: sse
+    description: Server-Sent Events für Browser-Clients
+    bindings:
+      http:
+        type: object
+        bindingVersion: 0.3.0
+    security:
+      - bearerAuth: []
+
+  message_bus:
+    host: localhost:5672
+    protocol: amqp
+    description: Message-Bus für Service-to-Service-Kommunikation
+    bindings:
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+          durable: true
+        bindingVersion: 0.3.0
+
+defaultContentType: application/json
+
+channels:
+  # Agent-Lifecycle-Events
+  agent/lifecycle:
+    address: agent.lifecycle
+    description: |
+      Channel für Agent-Lifecycle-Events wie Registrierung, Updates und Deprecation.
+    messages:
+      agentRegistered:
+        $ref: "#/components/messages/AgentRegisteredEvent"
+      agentUpdated:
+        $ref: "#/components/messages/AgentUpdatedEvent"
+      agentDeprecated:
+        $ref: "#/components/messages/AgentDeprecatedEvent"
+      agentDeleted:
+        $ref: "#/components/messages/AgentDeletedEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+              description: Filter nach Tenant-ID
+            agent_id:
+              type: string
+              description: Filter nach Agent-ID
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: agent.lifecycle.*
+        bindingVersion: 0.3.0
+
+  # Health-Events
+  agent/health:
+    address: agent.health
+    description: |
+      Channel für Agent-Health-Events und Performance-Metriken.
+    messages:
+      healthStatusChanged:
+        $ref: "#/components/messages/HealthStatusChangedEvent"
+      performanceAlert:
+        $ref: "#/components/messages/PerformanceAlertEvent"
+      healthCheckCompleted:
+        $ref: "#/components/messages/HealthCheckCompletedEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            agent_id:
+              type: string
+            min_severity:
+              type: string
+              enum: [info, warning, error, critical]
+              default: info
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: agent.health.*
+
+  # Rollout-Events
+  rollout/status:
+    address: rollout.status
+    description: |
+      Channel für Rollout-Status-Events und Deployment-Updates.
+    messages:
+      rolloutStarted:
+        $ref: "#/components/messages/RolloutStartedEvent"
+      rolloutPhaseChanged:
+        $ref: "#/components/messages/RolloutPhaseChangedEvent"
+      rolloutCompleted:
+        $ref: "#/components/messages/RolloutCompletedEvent"
+      rolloutFailed:
+        $ref: "#/components/messages/RolloutFailedEvent"
+      rolloutRolledBack:
+        $ref: "#/components/messages/RolloutRolledBackEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            agent_id:
+              type: string
+            rollout_id:
+              type: string
+              format: uuid
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: rollout.status.*
+
+  # Discovery-Events
+  discovery/activity:
+    address: discovery.activity
+    description: |
+      Channel für Discovery-Events und Load-Balancing-Aktivitäten.
+    messages:
+      discoveryRequested:
+        $ref: "#/components/messages/DiscoveryRequestedEvent"
+      discoveryCompleted:
+        $ref: "#/components/messages/DiscoveryCompletedEvent"
+      loadBalancingChanged:
+        $ref: "#/components/messages/LoadBalancingChangedEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            strategy:
+              type: string
+              enum:
+                [capability_based, health_based, load_based, geographic, hybrid]
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: discovery.activity.*
+
+  # Tenant-Events
+  tenant/management:
+    address: tenant.management
+    description: |
+      Channel für Tenant-Management-Events und Quota-Überwachung.
+    messages:
+      tenantRegistered:
+        $ref: "#/components/messages/TenantRegisteredEvent"
+      tenantUpdated:
+        $ref: "#/components/messages/TenantUpdatedEvent"
+      quotaExceeded:
+        $ref: "#/components/messages/QuotaExceededEvent"
+      quotaWarning:
+        $ref: "#/components/messages/QuotaWarningEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            quota_type:
+              type: string
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: tenant.management.*
+
+  # Security-Events
+  security/audit:
+    address: security.audit
+    description: |
+      Channel für Security-Events und Audit-Logs.
+    messages:
+      authenticationAttempt:
+        $ref: "#/components/messages/AuthenticationAttemptEvent"
+      authorizationDenied:
+        $ref: "#/components/messages/AuthorizationDeniedEvent"
+      securityViolation:
+        $ref: "#/components/messages/SecurityViolationEvent"
+    bindings:
+      ws:
+        method: GET
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            user_id:
+              type: string
+            severity:
+              type: string
+              enum: [low, medium, high, critical]
+      amqp:
+        exchange:
+          name: kei-events
+          type: topic
+        routingKey: security.audit.*
+
+operations:
+  # Subscribe-Operationen
+  subscribeAgentLifecycle:
+    action: receive
+    channel:
+      $ref: "#/channels/agent~1lifecycle"
+    summary: Abonniert Agent-Lifecycle-Events
+    description: |
+      Abonniert Events für Agent-Registrierung, Updates und Lifecycle-Änderungen.
+    security:
+      - bearerAuth: []
+    bindings:
+      ws:
+        query:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+              description: Filter nach Tenant-ID
+            agent_id:
+              type: string
+              description: Filter nach spezifischer Agent-ID
+
+  subscribeHealthEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/agent~1health"
+    summary: Abonniert Health-Events
+    description: |
+      Abonniert Health-Status-Änderungen und Performance-Alerts.
+    security:
+      - bearerAuth: []
+
+  subscribeRolloutEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/rollout~1status"
+    summary: Abonniert Rollout-Events
+    description: |
+      Abonniert Rollout-Status-Updates und Deployment-Events.
+    security:
+      - bearerAuth: []
+
+  subscribeDiscoveryEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/discovery~1activity"
+    summary: Abonniert Discovery-Events
+    description: |
+      Abonniert Discovery-Aktivitäten und Load-Balancing-Änderungen.
+    security:
+      - bearerAuth: []
+
+  subscribeTenantEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/tenant~1management"
+    summary: Abonniert Tenant-Events
+    description: |
+      Abonniert Tenant-Management-Events und Quota-Überwachung.
+    security:
+      - bearerAuth: []
+
+  subscribeSecurityEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/security~1audit"
+    summary: Abonniert Security-Events
+    description: |
+      Abonniert Security-Events und Audit-Logs.
+    security:
+      - bearerAuth: []
+    bindings:
+      ws:
+        query:
+          type: object
+          properties:
+            min_severity:
+              type: string
+              enum: [low, medium, high, critical]
+              default: medium
+
+  # Publish-Operationen
+  publishAgentEvent:
+    action: send
+    channel:
+      $ref: "#/channels/agent~1lifecycle"
+    summary: Publiziert Agent-Event
+    description: |
+      Publiziert Agent-Lifecycle-Event an alle Subscriber.
+    security:
+      - bearerAuth: []
+
+  publishHealthEvent:
+    action: send
+    channel:
+      $ref: "#/channels/agent~1health"
+    summary: Publiziert Health-Event
+    description: |
+      Publiziert Health-Status-Event an alle Subscriber.
+    security:
+      - bearerAuth: []
+
+  publishRolloutEvent:
+    action: send
+    channel:
+      $ref: "#/channels/rollout~1status"
+    summary: Publiziert Rollout-Event
+    description: |
+      Publiziert Rollout-Status-Event an alle Subscriber.
+    security:
+      - bearerAuth: []

@@ -1,0 +1,54 @@
+{
+  "name": "Keiko HMAC Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "keiko",
+        "options": {}
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Signatur in Header setzen und an Keiko-Backend senden\nreturn items;"
+      },
+      "id": "Function",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.function"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [ [ { "node": "Prepare", "type": "main", "index": 0 } ] ]
+    }
+  }
+}
+{
+  "name": "Keiko HMAC Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "keiko",
+        "options": {}
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Signatur in Header setzen und an Keiko-Backend senden\nreturn items;"
+      },
+      "id": "Function",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.function"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Prepare", "type": "main", "index": 0 }]]
+    }
+  }
+}

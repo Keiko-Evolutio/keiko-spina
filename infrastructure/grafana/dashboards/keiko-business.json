@@ -1,0 +1,53 @@
+{
+  "id": null,
+  "title": "Keiko Business KPIs",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "editable": true,
+  "tags": ["keiko", "business"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Agent Interactions/sec",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(keiko_business_event_total{event_name=\"agent_interaction\"}[5m])",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Avg Agent Response (ms)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "avg_over_time(client_business_agent_response_ms[5m])",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "User Engagement (events/sec)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(keiko_business_event_total{event_name=\"user_interaction\"}[5m])",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Client Error Rate (per min)",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(client_errors_total[5m]))", "refId": "A" }
+      ]
+    }
+  ]
+}

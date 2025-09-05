@@ -1,0 +1,282 @@
+name: 'Run Tests'
+description: 'Executes tests with comprehensive reporting and coverage'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  test-type:
+    description: 'Type of tests to run (unit, integration, e2e, all)'
+    required: false
+    default: 'unit'
+  test-path:
+    description: 'Path to test files/directory'
+    required: false
+    default: 'tests/'
+  working-directory:
+    description: 'Working directory for tests'
+    required: false
+    default: 'backend'
+  coverage-enabled:
+    description: 'Enable code coverage reporting'
+    required: false
+    default: 'true'
+  coverage-threshold:
+    description: 'Minimum coverage percentage required'
+    required: false
+    default: '80'
+  pytest-args:
+    description: 'Additional pytest arguments'
+    required: false
+    default: ''
+  max-failures:
+    description: 'Maximum number of test failures before stopping'
+    required: false
+    default: '5'
+  timeout-minutes:
+    description: 'Test execution timeout in minutes'
+    required: false
+    default: '30'
+  parallel-execution:
+    description: 'Enable parallel test execution'
+    required: false
+    default: 'false'
+  retry-failed:
+    description: 'Retry failed tests once'
+    required: false
+    default: 'true'
+  generate-html-report:
+    description: 'Generate HTML coverage report'
+    required: false
+    default: 'true'
+
+outputs:
+  test-result:
+    description: 'Test execution result (success, failure, partial)'
+    value: ${{ steps.run-tests.outputs.test-result }}
+  tests-run:
+    description: 'Number of tests executed'
+    value: ${{ steps.run-tests.outputs.tests-run }}
+  tests-passed:
+    description: 'Number of tests passed'
+    value: ${{ steps.run-tests.outputs.tests-passed }}
+  tests-failed:
+    description: 'Number of tests failed'
+    value: ${{ steps.run-tests.outputs.tests-failed }}
+  coverage-percentage:
+    description: 'Code coverage percentage'
+    value: ${{ steps.run-tests.outputs.coverage-percentage }}
+  execution-time:
+    description: 'Test execution time in seconds'
+    value: ${{ steps.run-tests.outputs.execution-time }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🧪 Execute Tests
+      id: run-tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🧪 Starting test execution..."
+        echo "Test type: ${{ inputs.test-type }}"
+        echo "Test path: ${{ inputs.test-path }}"
+        echo "Coverage enabled: ${{ inputs.coverage-enabled }}"
+        echo "Parallel execution: ${{ inputs.parallel-execution }}"
+        
+        # Record start time
+        start_time=$(date +%s)
+        
+        # Build pytest command
+        pytest_cmd="pytest"
+        
+        # Add test path
+        pytest_cmd="$pytest_cmd ${{ inputs.test-path }}"
+        
+        # Add coverage options
+        if [ "${{ inputs.coverage-enabled }}" = "true" ]; then
+          pytest_cmd="$pytest_cmd --cov=. --cov-report=xml --cov-report=term-missing"
+          
+          if [ "${{ inputs.generate-html-report }}" = "true" ]; then
+            pytest_cmd="$pytest_cmd --cov-report=html"
+          fi
+          
+          # Add coverage threshold
+          if [ -n "${{ inputs.coverage-threshold }}" ]; then
+            pytest_cmd="$pytest_cmd --cov-fail-under=${{ inputs.coverage-threshold }}"
+          fi
+        fi
+        
+        # Add JUnit XML output
+        pytest_cmd="$pytest_cmd --junit-xml=pytest-${{ inputs.test-type }}-results.xml"
+        
+        # Add verbosity and formatting
+        pytest_cmd="$pytest_cmd -v --tb=short"
+        
+        # Add max failures
+        if [ -n "${{ inputs.max-failures }}" ]; then
+          pytest_cmd="$pytest_cmd --maxfail=${{ inputs.max-failures }}"
+        fi
+        
+        # Add parallel execution
+        if [ "${{ inputs.parallel-execution }}" = "true" ]; then
+          # Install pytest-xdist if not already installed
+          pip install pytest-xdist
+          pytest_cmd="$pytest_cmd -n auto"
+        fi
+        
+        # Add test type markers
+        case "${{ inputs.test-type }}" in
+          "unit")
+            pytest_cmd="$pytest_cmd -m 'not integration and not e2e and not slow'"
+            ;;
+          "integration")
+            pytest_cmd="$pytest_cmd -m 'integration and not e2e'"
+            ;;
+          "e2e")
+            pytest_cmd="$pytest_cmd -m 'e2e'"
+            ;;
+          "slow")
+            pytest_cmd="$pytest_cmd -m 'slow'"
+            ;;
+          "all")
+            # Run all tests
+            ;;
+          *)
+            echo "⚠️ Unknown test type: ${{ inputs.test-type }}"
+            ;;
+        esac
+        
+        # Add custom pytest arguments
+        if [ -n "${{ inputs.pytest-args }}" ]; then
+          pytest_cmd="$pytest_cmd ${{ inputs.pytest-args }}"
+        fi
+        
+        echo "🚀 Executing: $pytest_cmd"
+        
+        # Execute tests with timeout
+        test_result="failure"
+        tests_run=0
+        tests_passed=0
+        tests_failed=0
+        coverage_percentage=0
+        
+        if timeout ${{ inputs.timeout-minutes }}m $pytest_cmd; then
+          test_result="success"
+          echo "✅ Tests passed successfully"
+        else
+          exit_code=$?
+          if [ $exit_code -eq 124 ]; then
+            echo "⏰ Tests timed out after ${{ inputs.timeout-minutes }} minutes"
+            test_result="timeout"
+          else
+            echo "❌ Tests failed with exit code: $exit_code"
+            
+            # Retry failed tests if enabled
+            if [ "${{ inputs.retry-failed }}" = "true" ]; then
+              echo "🔄 Retrying failed tests..."
+              if $pytest_cmd --lf --tb=short; then
+                echo "✅ Retry successful"
+                test_result="success"
+              else
+                echo "❌ Retry also failed"
+                test_result="failure"
+              fi
+            fi
+          fi
+        fi
+        
+        # Calculate execution time
+        end_time=$(date +%s)
+        execution_time=$((end_time - start_time))
+        
+        # Parse test results from JUnit XML
+        if [ -f "pytest-${{ inputs.test-type }}-results.xml" ]; then
+          # Extract test counts using basic tools
+          tests_run=$(grep -o 'tests="[0-9]*"' pytest-${{ inputs.test-type }}-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+          tests_failed=$(grep -o 'failures="[0-9]*"' pytest-${{ inputs.test-type }}-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+          tests_errors=$(grep -o 'errors="[0-9]*"' pytest-${{ inputs.test-type }}-results.xml | grep -o '[0-9]*' | head -1 || echo "0")
+          tests_failed=$((tests_failed + tests_errors))
+          tests_passed=$((tests_run - tests_failed))
+        fi
+        
+        # Parse coverage percentage
+        if [ "${{ inputs.coverage-enabled }}" = "true" ] && [ -f "coverage.xml" ]; then
+          coverage_percentage=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1 | grep -o '[0-9.]*' | head -1 || echo "0")
+          # Convert to percentage
+          coverage_percentage=$(echo "$coverage_percentage * 100" | bc -l 2>/dev/null | cut -d. -f1 || echo "0")
+        fi
+        
+        # Set outputs
+        echo "test-result=$test_result" >> $GITHUB_OUTPUT
+        echo "tests-run=$tests_run" >> $GITHUB_OUTPUT
+        echo "tests-passed=$tests_passed" >> $GITHUB_OUTPUT
+        echo "tests-failed=$tests_failed" >> $GITHUB_OUTPUT
+        echo "coverage-percentage=$coverage_percentage" >> $GITHUB_OUTPUT
+        echo "execution-time=$execution_time" >> $GITHUB_OUTPUT
+        
+        # Log summary
+        echo "📊 Test Execution Summary:"
+        echo "  Result: $test_result"
+        echo "  Tests run: $tests_run"
+        echo "  Tests passed: $tests_passed"
+        echo "  Tests failed: $tests_failed"
+        echo "  Coverage: $coverage_percentage%"
+        echo "  Execution time: ${execution_time}s"
+        
+        # Exit with appropriate code
+        if [ "$test_result" = "success" ]; then
+          exit 0
+        else
+          exit 1
+        fi
+
+    - name: 📊 Generate Test Report
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "## 🧪 Test Execution Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Test Type** | ${{ inputs.test-type }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Result** | ${{ steps.run-tests.outputs.test-result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Tests Run** | ${{ steps.run-tests.outputs.tests-run }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Tests Passed** | ${{ steps.run-tests.outputs.tests-passed }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Tests Failed** | ${{ steps.run-tests.outputs.tests-failed }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Execution Time** | ${{ steps.run-tests.outputs.execution-time }}s |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.coverage-enabled }}" = "true" ]; then
+          echo "| **Coverage** | ${{ steps.run-tests.outputs.coverage-percentage }}% |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add status emoji
+        case "${{ steps.run-tests.outputs.test-result }}" in
+          "success")
+            echo "### ✅ Tests Passed Successfully" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "failure")
+            echo "### ❌ Tests Failed" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "timeout")
+            echo "### ⏰ Tests Timed Out" >> $GITHUB_STEP_SUMMARY
+            ;;
+          *)
+            echo "### ⚠️ Unknown Test Result" >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        # Add coverage status
+        if [ "${{ inputs.coverage-enabled }}" = "true" ]; then
+          coverage=${{ steps.run-tests.outputs.coverage-percentage }}
+          threshold=${{ inputs.coverage-threshold }}
+          
+          if [ "$coverage" -ge "$threshold" ]; then
+            echo "✅ **Coverage threshold met** ($coverage% >= $threshold%)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Coverage threshold not met** ($coverage% < $threshold%)" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi

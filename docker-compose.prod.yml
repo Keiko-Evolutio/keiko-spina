@@ -1,0 +1,306 @@
+# docker-compose.prod.yml
+# Production Override für Keiko Personal Assistant
+# Erweitert docker-compose.dev.yml mit produktionsspezifischen Konfigurationen
+
+include:
+  # Base Infrastructure Services
+  - infrastructure/docker-compose/base/postgres.yml
+  - infrastructure/docker-compose/base/redis.yml
+  - infrastructure/docker-compose/base/messaging.yml
+  - infrastructure/docker-compose/base/mail.yml
+  
+  # Monitoring and Observability
+  - infrastructure/docker-compose/monitoring/observability.yml
+  - infrastructure/docker-compose/monitoring/grafana.yml
+  - infrastructure/docker-compose/monitoring/jaeger.yml
+  - infrastructure/docker-compose/monitoring/otel.yml
+  
+  # Edge Computing Services
+  - infrastructure/docker-compose/edge/edge-registry.yml
+  - infrastructure/docker-compose/edge/edge-nodes.yml
+  - infrastructure/docker-compose/edge/edge-load-balancer.yml
+  - infrastructure/docker-compose/edge/edge-monitor.yml
+  
+  # Workflow Automation
+  - infrastructure/docker-compose/workflow/n8n.yml
+  
+  # Production Overrides
+  - infrastructure/docker-compose/production/health-checks.yml
+  - infrastructure/docker-compose/production/resource-limits.yml
+  - infrastructure/docker-compose/production/security.yml
+
+# =============================================================================
+# PRODUCTION OVERRIDES
+# =============================================================================
+
+services:
+  # PostgreSQL Production Overrides
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keiko_user -d keiko_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    environment:
+      - POSTGRES_DB=keiko_prod
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=1GB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
+
+  # Redis Production Overrides
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    command: >
+      redis-server
+      --maxmemory 1.5gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+
+  # Prometheus Production Overrides
+  prometheus:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+
+  # Alertmanager Production Overrides
+  alertmanager:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+
+  # Grafana Production Overrides
+  grafana:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+
+  # Jaeger Production Overrides
+  jaeger:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:16686/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+
+  # OpenTelemetry Collector Production Overrides
+  otel-collector:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:13133/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+
+  # NATS Production Overrides
+  nats:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8222/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  # Edge Services Production Overrides
+  edge-registry:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+
+  edge-node-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+
+  edge-node-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+
+  edge-node-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8087/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+
+# =============================================================================
+# PRODUCTION NETWORKS AND VOLUMES
+# =============================================================================
+
+networks:
+  keiko-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: keiko-prod
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  # Persistent volumes for production
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/keiko/data/postgres
+  
+  prometheus-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/keiko/data/prometheus
+  
+  grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/keiko/data/grafana
+  
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/keiko/data/redis

@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package services.streaming.v1;
+
+option go_package = "github.com/keiko-platform/services-streaming/gen/go/services/streaming/v1;servicesstreamingv1";
+option java_multiple_files = true;
+option java_package = "com.keiko.services.streaming.v1";
+option csharp_namespace = "Keiko.Services.Streaming.V1";
+
+// KEI-Stream gRPC Service v1
+// Bidi-Streaming von typisierten Frames gemäß KEI-Stream Spezifikation.
+
+message FrameHeader {
+  string id = 1;          // msg_id
+  string stream_id = 2;
+  int64 seq = 3;
+  string ts = 4;          // RFC3339
+  string corr_id = 5;     // correlation id
+  string traceparent = 6; // w3c traceparent
+}
+
+message ChunkInfo {
+  string kind = 1;            // start|continue|end
+  string content_range = 2;   // bytes <start>-<end>/<total>
+  string checksum = 3;        // sha256
+}
+
+message ErrorInfo {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string details_json = 4; // JSON-encoded details
+}
+
+message AckInfo {
+  int64 ack_seq = 1;
+  int32 credit = 2;      // optional; -1 wenn nicht gesetzt
+  string reason = 3;
+}
+
+message StreamFrame {
+  string type = 1;                     // partial|final|tool_call|tool_result|status|error|heartbeat|ack|nack|resume|chunk_start|chunk_continue|chunk_end
+  FrameHeader header = 2;
+  string payload_json = 3;             // JSON payload
+  string binary_ref = 4;               // optional
+  ChunkInfo chunk = 5;                 // optional
+  ErrorInfo error = 6;                 // optional
+  AckInfo ack = 7;                     // optional
+}
+
+service KEIStreamService {
+  // Bidirektionaler Stream für Events und Chunks
+  rpc Stream(stream StreamFrame) returns (stream StreamFrame) {}
+}

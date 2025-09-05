@@ -1,0 +1,381 @@
+name: 'Performance Monitor'
+description: 'Comprehensive performance monitoring for CI/CD pipelines with trend analysis'
+branding:
+  icon: 'activity'
+  color: 'orange'
+
+inputs:
+  job-name:
+    description: 'Name of the job being monitored'
+    required: true
+  operation:
+    description: 'Operation being monitored (start, end, checkpoint)'
+    required: true
+  checkpoint-name:
+    description: 'Name of checkpoint for intermediate monitoring'
+    required: false
+    default: ''
+  sla-threshold:
+    description: 'SLA threshold in seconds'
+    required: false
+    default: '1800'  # 30 minutes
+  enable-regression-detection:
+    description: 'Enable performance regression detection'
+    required: false
+    default: 'true'
+  baseline-branch:
+    description: 'Baseline branch for regression comparison'
+    required: false
+    default: 'main'
+  performance-endpoint:
+    description: 'Endpoint for sending performance data'
+    required: false
+    default: ''
+  alert-webhook:
+    description: 'Webhook for performance alerts'
+    required: false
+    default: ''
+
+outputs:
+  execution-time:
+    description: 'Execution time in seconds'
+    value: ${{ steps.monitor.outputs.execution-time }}
+  performance-score:
+    description: 'Performance score (0-100)'
+    value: ${{ steps.monitor.outputs.performance-score }}
+  sla-status:
+    description: 'SLA compliance status (pass, warn, fail)'
+    value: ${{ steps.monitor.outputs.sla-status }}
+  regression-detected:
+    description: 'Whether performance regression was detected'
+    value: ${{ steps.monitor.outputs.regression-detected }}
+  resource-usage:
+    description: 'Resource usage metrics'
+    value: ${{ steps.monitor.outputs.resource-usage }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📊 Performance Monitoring
+      id: monitor
+      shell: bash
+      run: |
+        echo "📊 Performance monitoring for: ${{ inputs.job-name }}"
+        echo "Operation: ${{ inputs.operation }}"
+        
+        # Create performance data directory
+        mkdir -p performance-data
+        
+        # Performance data file
+        PERF_FILE="performance-data/${{ inputs.job-name }}-performance.json"
+        TIMESTAMP=$(date +%s)
+        ISO_TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        case "${{ inputs.operation }}" in
+          "start")
+            echo "🚀 Starting performance monitoring..."
+            
+            # Record start time
+            echo "$TIMESTAMP" > "performance-data/${{ inputs.job-name }}-start.time"
+            
+            # Collect initial system metrics
+            INITIAL_METRICS=$(cat << EOF
+        {
+          "job_name": "${{ inputs.job-name }}",
+          "operation": "start",
+          "timestamp": $TIMESTAMP,
+          "iso_timestamp": "$ISO_TIMESTAMP",
+          "workflow": "${{ github.workflow }}",
+          "run_id": "${{ github.run_id }}",
+          "run_number": "${{ github.run_number }}",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "actor": "${{ github.actor }}",
+          "runner_os": "${{ runner.os }}",
+          "runner_arch": "${{ runner.arch }}",
+          "system_metrics": {
+            "cpu_cores": $(nproc 2>/dev/null || echo "0"),
+            "memory_total_mb": $(free -m 2>/dev/null | awk 'NR==2{print $2}' || echo "0"),
+            "disk_available_gb": $(df -BG . 2>/dev/null | awk 'NR==2{print $4}' | sed 's/G//' || echo "0")
+          }
+        }
+        EOF
+            )
+            
+            echo "$INITIAL_METRICS" > "$PERF_FILE"
+            echo "✅ Performance monitoring started"
+            ;;
+            
+          "checkpoint")
+            echo "📍 Recording performance checkpoint: ${{ inputs.checkpoint-name }}"
+            
+            if [ ! -f "performance-data/${{ inputs.job-name }}-start.time" ]; then
+              echo "⚠️ No start time found, creating checkpoint anyway"
+              echo "$TIMESTAMP" > "performance-data/${{ inputs.job-name }}-start.time"
+            fi
+            
+            START_TIME=$(cat "performance-data/${{ inputs.job-name }}-start.time")
+            CHECKPOINT_DURATION=$((TIMESTAMP - START_TIME))
+            
+            # Collect current system metrics
+            CPU_USAGE=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//' || echo "0")
+            MEMORY_USED=$(free -m 2>/dev/null | awk 'NR==2{printf "%.1f", $3*100/$2}' || echo "0")
+            
+            # Update performance file with checkpoint
+            if [ -f "$PERF_FILE" ]; then
+              # Add checkpoint to existing file
+              CHECKPOINT_DATA=$(cat << EOF
+          {
+            "name": "${{ inputs.checkpoint-name }}",
+            "timestamp": $TIMESTAMP,
+            "duration_from_start": $CHECKPOINT_DURATION,
+            "cpu_usage": "$CPU_USAGE",
+            "memory_usage": "$MEMORY_USED"
+          }
+        EOF
+              )
+              
+              # Update JSON with checkpoint (simplified approach)
+              cp "$PERF_FILE" "${PERF_FILE}.tmp"
+              sed 's/}$/,"checkpoints":[]}/' "${PERF_FILE}.tmp" > "$PERF_FILE" 2>/dev/null || cp "${PERF_FILE}.tmp" "$PERF_FILE"
+            fi
+            
+            echo "✅ Checkpoint recorded: ${{ inputs.checkpoint-name }} (${CHECKPOINT_DURATION}s)"
+            ;;
+            
+          "end")
+            echo "🏁 Ending performance monitoring..."
+            
+            if [ ! -f "performance-data/${{ inputs.job-name }}-start.time" ]; then
+              echo "⚠️ No start time found, using current time"
+              START_TIME=$TIMESTAMP
+            else
+              START_TIME=$(cat "performance-data/${{ inputs.job-name }}-start.time")
+            fi
+            
+            EXECUTION_TIME=$((TIMESTAMP - START_TIME))
+            SLA_THRESHOLD=${{ inputs.sla-threshold }}
+            
+            # Determine SLA status
+            if [ $EXECUTION_TIME -le $SLA_THRESHOLD ]; then
+              SLA_STATUS="pass"
+            elif [ $EXECUTION_TIME -le $((SLA_THRESHOLD + 300)) ]; then  # 5 min grace
+              SLA_STATUS="warn"
+            else
+              SLA_STATUS="fail"
+            fi
+            
+            # Calculate performance score (0-100)
+            if [ $EXECUTION_TIME -le $((SLA_THRESHOLD / 2)) ]; then
+              PERFORMANCE_SCORE=100
+            elif [ $EXECUTION_TIME -le $SLA_THRESHOLD ]; then
+              PERFORMANCE_SCORE=$((100 - (EXECUTION_TIME - SLA_THRESHOLD/2) * 50 / (SLA_THRESHOLD/2)))
+            else
+              PERFORMANCE_SCORE=$((50 - (EXECUTION_TIME - SLA_THRESHOLD) * 50 / SLA_THRESHOLD))
+              [ $PERFORMANCE_SCORE -lt 0 ] && PERFORMANCE_SCORE=0
+            fi
+            
+            # Collect final system metrics
+            FINAL_CPU=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//' || echo "0")
+            FINAL_MEMORY=$(free -m 2>/dev/null | awk 'NR==2{printf "%.1f", $3*100/$2}' || echo "0")
+            FINAL_DISK=$(df -BG . 2>/dev/null | awk 'NR==2{print $4}' | sed 's/G//' || echo "0")
+            
+            # Resource usage summary
+            RESOURCE_USAGE="cpu:${FINAL_CPU}%,memory:${FINAL_MEMORY}%,disk:${FINAL_DISK}GB"
+            
+            # Performance regression detection
+            REGRESSION_DETECTED="false"
+            if [ "${{ inputs.enable-regression-detection }}" = "true" ]; then
+              echo "🔍 Checking for performance regressions..."
+              
+              # Simple regression detection (compare with SLA + 20%)
+              REGRESSION_THRESHOLD=$((SLA_THRESHOLD + SLA_THRESHOLD / 5))
+              if [ $EXECUTION_TIME -gt $REGRESSION_THRESHOLD ]; then
+                REGRESSION_DETECTED="true"
+                echo "⚠️ Performance regression detected!"
+              fi
+            fi
+            
+            # Create final performance report
+            FINAL_REPORT=$(cat << EOF
+        {
+          "job_name": "${{ inputs.job-name }}",
+          "operation": "end",
+          "timestamp": $TIMESTAMP,
+          "iso_timestamp": "$ISO_TIMESTAMP",
+          "execution_time": $EXECUTION_TIME,
+          "sla_threshold": $SLA_THRESHOLD,
+          "sla_status": "$SLA_STATUS",
+          "performance_score": $PERFORMANCE_SCORE,
+          "regression_detected": $REGRESSION_DETECTED,
+          "resource_usage": {
+            "cpu_usage": "$FINAL_CPU",
+            "memory_usage": "$FINAL_MEMORY",
+            "disk_available": "$FINAL_DISK"
+          },
+          "workflow_context": {
+            "workflow": "${{ github.workflow }}",
+            "run_id": "${{ github.run_id }}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "actor": "${{ github.actor }}"
+          }
+        }
+        EOF
+            )
+            
+            echo "$FINAL_REPORT" > "${PERF_FILE}.final"
+            
+            # Set outputs
+            echo "execution-time=$EXECUTION_TIME" >> $GITHUB_OUTPUT
+            echo "performance-score=$PERFORMANCE_SCORE" >> $GITHUB_OUTPUT
+            echo "sla-status=$SLA_STATUS" >> $GITHUB_OUTPUT
+            echo "regression-detected=$REGRESSION_DETECTED" >> $GITHUB_OUTPUT
+            echo "resource-usage=$RESOURCE_USAGE" >> $GITHUB_OUTPUT
+            
+            # Log summary
+            echo "📊 Performance Summary:"
+            echo "  Execution Time: ${EXECUTION_TIME}s"
+            echo "  SLA Threshold: ${SLA_THRESHOLD}s"
+            echo "  SLA Status: $SLA_STATUS"
+            echo "  Performance Score: $PERFORMANCE_SCORE/100"
+            echo "  Regression Detected: $REGRESSION_DETECTED"
+            echo "  Resource Usage: $RESOURCE_USAGE"
+            
+            # Cleanup
+            rm -f "performance-data/${{ inputs.job-name }}-start.time"
+            ;;
+            
+          *)
+            echo "❌ Unknown operation: ${{ inputs.operation }}"
+            exit 1
+            ;;
+        esac
+
+    - name: 🚨 Performance Alerting
+      if: inputs.operation == 'end' && (steps.monitor.outputs.sla-status == 'fail' || steps.monitor.outputs.regression-detected == 'true')
+      shell: bash
+      run: |
+        echo "🚨 Performance alert triggered!"
+        
+        EXECUTION_TIME="${{ steps.monitor.outputs.execution-time }}"
+        SLA_STATUS="${{ steps.monitor.outputs.sla-status }}"
+        REGRESSION_DETECTED="${{ steps.monitor.outputs.regression-detected }}"
+        PERFORMANCE_SCORE="${{ steps.monitor.outputs.performance-score }}"
+        
+        # Create alert message
+        ALERT_MESSAGE="🚨 Performance Alert: ${{ inputs.job-name }}
+        
+        Execution Time: ${EXECUTION_TIME}s
+        SLA Status: $SLA_STATUS
+        Performance Score: $PERFORMANCE_SCORE/100
+        Regression Detected: $REGRESSION_DETECTED
+        
+        Workflow: ${{ github.workflow }}
+        Run: ${{ github.run_id }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Actor: ${{ github.actor }}"
+        
+        echo "$ALERT_MESSAGE"
+        
+        # Send webhook alert if configured
+        if [ -n "${{ inputs.alert-webhook }}" ]; then
+          echo "📧 Sending performance alert..."
+          
+          WEBHOOK_PAYLOAD=$(cat << EOF
+        {
+          "text": "🚨 Performance Alert",
+          "attachments": [
+            {
+              "color": "danger",
+              "fields": [
+                {
+                  "title": "Job",
+                  "value": "${{ inputs.job-name }}",
+                  "short": true
+                },
+                {
+                  "title": "Execution Time",
+                  "value": "${EXECUTION_TIME}s",
+                  "short": true
+                },
+                {
+                  "title": "SLA Status",
+                  "value": "$SLA_STATUS",
+                  "short": true
+                },
+                {
+                  "title": "Performance Score",
+                  "value": "$PERFORMANCE_SCORE/100",
+                  "short": true
+                },
+                {
+                  "title": "Workflow",
+                  "value": "${{ github.workflow }}",
+                  "short": true
+                },
+                {
+                  "title": "Branch",
+                  "value": "${{ github.ref_name }}",
+                  "short": true
+                }
+              ]
+            }
+          ]
+        }
+        EOF
+          )
+          
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$WEBHOOK_PAYLOAD" \
+            "${{ inputs.alert-webhook }}" || echo "⚠️ Failed to send alert"
+        fi
+
+    - name: 📊 Generate Performance Summary
+      if: inputs.operation == 'end'
+      shell: bash
+      run: |
+        echo "## 📊 Performance Monitoring Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Job** | ${{ inputs.job-name }} | - |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Execution Time** | ${{ steps.monitor.outputs.execution-time }}s | - |" >> $GITHUB_STEP_SUMMARY
+        echo "| **SLA Threshold** | ${{ inputs.sla-threshold }}s | - |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Performance Score** | ${{ steps.monitor.outputs.performance-score }}/100 | - |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Resource Usage** | ${{ steps.monitor.outputs.resource-usage }} | - |" >> $GITHUB_STEP_SUMMARY
+        
+        # Add status-specific sections
+        case "${{ steps.monitor.outputs.sla-status }}" in
+          "pass")
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ SLA Compliance: PASS" >> $GITHUB_STEP_SUMMARY
+            echo "Performance is within acceptable limits." >> $GITHUB_STEP_SUMMARY
+            ;;
+          "warn")
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ SLA Compliance: WARNING" >> $GITHUB_STEP_SUMMARY
+            echo "Performance is slightly above threshold but within grace period." >> $GITHUB_STEP_SUMMARY
+            ;;
+          "fail")
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ SLA Compliance: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Performance exceeded acceptable limits. Investigation required." >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        if [ "${{ steps.monitor.outputs.regression-detected }}" = "true" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Regression Detection: DETECTED" >> $GITHUB_STEP_SUMMARY
+          echo "Performance regression detected compared to baseline." >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: 📤 Upload Performance Data
+      if: inputs.operation == 'end'
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-data-${{ inputs.job-name }}-${{ github.run_id }}
+        path: performance-data/
+        retention-days: 30

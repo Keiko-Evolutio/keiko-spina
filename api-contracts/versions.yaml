@@ -1,0 +1,86 @@
+# API Versions Configuration für Keiko Platform-SDK
+# Definiert unterstützte API-Versionen und deren Lifecycle
+
+current_version: "v1"
+supported_versions: ["v1"]
+
+versions:
+  v1:
+    version: "1.0.0"
+    release_date: "2024-01-15T10:00:00Z"
+    status: "stable"
+    deprecated: false
+    sunset_date: null
+    changelog:
+      - "Initial API release für Issue #56 Messaging-first Architecture"
+      - "Platform-SDK Events API mit HTTP/REST Endpoints"
+      - "Platform-SDK Management API für Agent-Verwaltung"
+      - "gRPC Streaming Services für High-performance Kommunikation"
+      - "Server-Sent Events für Real-time Event-Streaming"
+      - "Automatische Schema-Validierung für API-Requests"
+      - "Comprehensive Health Checks und Metrics"
+      - "API-first Kommunikationsstrategie implementiert"
+    features:
+      - "event_publishing"
+      - "agent_management"
+      - "function_orchestration"
+      - "real_time_streaming"
+      - "grpc_streaming"
+      - "schema_validation"
+      - "health_monitoring"
+    breaking_changes: []
+    migration_guide: null
+
+  # Zukünftige Versionen (Planung)
+  v2:
+    version: "2.0.0"
+    release_date: null
+    status: "planned"
+    deprecated: false
+    sunset_date: null
+    changelog:
+      - "Enhanced Event-Streaming mit WebSocket Support"
+      - "Advanced Function-Orchestration mit Workflow-Support"
+      - "Improved Error Handling und Retry-Mechanismen"
+      - "Enhanced Security mit OAuth2/OIDC Integration"
+      - "Performance Optimierungen für High-throughput Scenarios"
+    features:
+      - "websocket_streaming"
+      - "workflow_orchestration"
+      - "oauth2_integration"
+      - "enhanced_retry_logic"
+      - "performance_optimizations"
+    breaking_changes:
+      - "Event schema changes für enhanced metadata"
+      - "Function call interface updates"
+      - "Authentication mechanism changes"
+    migration_guide: "docs/migration/v1-to-v2.md"
+
+# API Lifecycle Policies
+lifecycle_policies:
+  deprecation_notice_period_months: 6
+  sunset_period_months: 12
+  minimum_supported_versions: 2
+  
+# Backward Compatibility Rules
+compatibility_rules:
+  - "Additive changes are allowed (new fields, endpoints)"
+  - "Field removal requires major version bump"
+  - "Enum value changes require major version bump"
+  - "URL structure changes require major version bump"
+  - "Response format changes require major version bump"
+
+# Version Headers
+version_headers:
+  request_header: "X-API-Version"
+  response_header: "X-API-Version"
+  deprecation_header: "Warning"
+  sunset_header: "Sunset"
+
+# Documentation URLs
+documentation:
+  base_url: "https://docs.keiko.dev/api"
+  openapi_spec_url: "/api/v1/openapi.json"
+  asyncapi_spec_url: "/api/v1/asyncapi.json"
+  changelog_url: "/api/changelog"
+  migration_guides_url: "/api/migration"

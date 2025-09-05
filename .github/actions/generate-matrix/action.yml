@@ -1,0 +1,230 @@
+name: 'Generate Dynamic Matrix'
+description: 'Generates dynamic test matrices based on changes and conditions'
+branding:
+  icon: 'grid'
+  color: 'blue'
+
+inputs:
+  matrix-type:
+    description: 'Type of matrix to generate (test, security, performance)'
+    required: true
+  changes:
+    description: 'JSON string of detected changes'
+    required: false
+    default: '{}'
+  max-parallel:
+    description: 'Maximum parallel jobs'
+    required: false
+    default: '10'
+  include-slow-tests:
+    description: 'Include slow tests in matrix'
+    required: false
+    default: 'false'
+  target-platforms:
+    description: 'Target platforms (comma-separated)'
+    required: false
+    default: 'ubuntu-latest'
+  python-versions:
+    description: 'Python versions to test (comma-separated)'
+    required: false
+    default: '3.11,3.12'
+
+outputs:
+  matrix:
+    description: 'Generated matrix configuration'
+    value: ${{ steps.generate.outputs.matrix }}
+  total-jobs:
+    description: 'Total number of jobs in matrix'
+    value: ${{ steps.generate.outputs.total-jobs }}
+  estimated-duration:
+    description: 'Estimated total duration in minutes'
+    value: ${{ steps.generate.outputs.estimated-duration }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🧮 Generate Dynamic Matrix
+      id: generate
+      shell: bash
+      run: |
+        echo "🧮 Generating dynamic matrix for: ${{ inputs.matrix-type }}"
+        
+        # Parse inputs
+        MATRIX_TYPE="${{ inputs.matrix-type }}"
+        CHANGES='${{ inputs.changes }}'
+        MAX_PARALLEL=${{ inputs.max-parallel }}
+        INCLUDE_SLOW="${{ inputs.include-slow-tests }}"
+        PLATFORMS="${{ inputs.target-platforms }}"
+        PYTHON_VERSIONS="${{ inputs.python-versions }}"
+        
+        # Initialize matrix
+        matrix_include=()
+        total_jobs=0
+        estimated_duration=0
+        
+        # Function to add matrix entry
+        add_matrix_entry() {
+          local entry="$1"
+          matrix_include+=("$entry")
+          total_jobs=$((total_jobs + 1))
+        }
+        
+        case "$MATRIX_TYPE" in
+          "test")
+            echo "📋 Generating test matrix..."
+            
+            # Convert comma-separated values to arrays
+            IFS=',' read -ra PLATFORM_ARRAY <<< "$PLATFORMS"
+            IFS=',' read -ra PYTHON_ARRAY <<< "$PYTHON_VERSIONS"
+            
+            # Generate test combinations
+            for platform in "${PLATFORM_ARRAY[@]}"; do
+              for python_version in "${PYTHON_ARRAY[@]}"; do
+                # Basic test configuration
+                entry="{\"os\":\"$platform\",\"python-version\":\"$python_version\",\"test-type\":\"unit\",\"timeout\":15}"
+                add_matrix_entry "$entry"
+                
+                # Add integration tests for main platform/version
+                if [[ "$platform" == "ubuntu-latest" && "$python_version" == "3.12" ]]; then
+                  entry="{\"os\":\"$platform\",\"python-version\":\"$python_version\",\"test-type\":\"integration\",\"timeout\":30}"
+                  add_matrix_entry "$entry"
+                  
+                  # Add E2E tests if changes include backend
+                  if echo "$CHANGES" | grep -q '"backend":"true"'; then
+                    entry="{\"os\":\"$platform\",\"python-version\":\"$python_version\",\"test-type\":\"e2e\",\"timeout\":60}"
+                    add_matrix_entry "$entry"
+                  fi
+                fi
+                
+                # Add slow tests if requested
+                if [[ "$INCLUDE_SLOW" == "true" && "$platform" == "ubuntu-latest" ]]; then
+                  entry="{\"os\":\"$platform\",\"python-version\":\"$python_version\",\"test-type\":\"slow\",\"timeout\":90}"
+                  add_matrix_entry "$entry"
+                fi
+              done
+            done
+            
+            estimated_duration=45  # Base estimation for test matrix
+            ;;
+            
+          "security")
+            echo "🛡️ Generating security matrix..."
+            
+            # Security scan types
+            scan_types=("dependencies" "code-analysis" "secrets" "container")
+            
+            for scan_type in "${scan_types[@]}"; do
+              case "$scan_type" in
+                "dependencies")
+                  entry="{\"scan-type\":\"$scan_type\",\"tools\":\"safety pip-audit\",\"timeout\":15}"
+                  ;;
+                "code-analysis")
+                  entry="{\"scan-type\":\"$scan_type\",\"tools\":\"bandit semgrep\",\"timeout\":20}"
+                  ;;
+                "secrets")
+                  entry="{\"scan-type\":\"$scan_type\",\"tools\":\"truffleHog gitleaks\",\"timeout\":10}"
+                  ;;
+                "container")
+                  # Only include if Docker files changed
+                  if echo "$CHANGES" | grep -q '"docker":"true"'; then
+                    entry="{\"scan-type\":\"$scan_type\",\"tools\":\"trivy grype\",\"timeout\":25}"
+                  else
+                    continue
+                  fi
+                  ;;
+              esac
+              add_matrix_entry "$entry"
+            done
+            
+            estimated_duration=25  # Base estimation for security matrix
+            ;;
+            
+          "performance")
+            echo "⚡ Generating performance matrix..."
+            
+            # Performance test types
+            perf_types=("benchmark" "load" "stress")
+            
+            for perf_type in "${perf_types[@]}"; do
+              case "$perf_type" in
+                "benchmark")
+                  entry="{\"test-type\":\"$perf_type\",\"timeout\":20,\"parallel\":true}"
+                  ;;
+                "load")
+                  entry="{\"test-type\":\"$perf_type\",\"timeout\":30,\"parallel\":false}"
+                  ;;
+                "stress")
+                  # Only include stress tests for main branch or manual trigger
+                  if [[ "$GITHUB_REF" == "refs/heads/main" || "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+                    entry="{\"test-type\":\"$perf_type\",\"timeout\":45,\"parallel\":false}"
+                  else
+                    continue
+                  fi
+                  ;;
+              esac
+              add_matrix_entry "$entry"
+            done
+            
+            estimated_duration=35  # Base estimation for performance matrix
+            ;;
+            
+          *)
+            echo "❌ Unknown matrix type: $MATRIX_TYPE"
+            exit 1
+            ;;
+        esac
+        
+        # Build final matrix JSON
+        if [ ${#matrix_include[@]} -eq 0 ]; then
+          echo "⚠️ No matrix entries generated"
+          matrix_json='{"include":[]}'
+        else
+          # Join array elements with commas
+          matrix_entries=$(IFS=','; echo "${matrix_include[*]}")
+          matrix_json="{\"include\":[$matrix_entries]}"
+        fi
+        
+        # Adjust max parallel based on total jobs
+        if [ $total_jobs -lt $MAX_PARALLEL ]; then
+          actual_parallel=$total_jobs
+        else
+          actual_parallel=$MAX_PARALLEL
+        fi
+        
+        # Calculate estimated duration with parallelization
+        if [ $actual_parallel -gt 0 ]; then
+          estimated_duration=$((estimated_duration * (total_jobs + actual_parallel - 1) / actual_parallel))
+        fi
+        
+        # Output results
+        echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+        echo "total-jobs=$total_jobs" >> $GITHUB_OUTPUT
+        echo "estimated-duration=$estimated_duration" >> $GITHUB_OUTPUT
+        
+        # Log summary
+        echo "📊 Matrix Generation Summary:"
+        echo "  Type: $MATRIX_TYPE"
+        echo "  Total jobs: $total_jobs"
+        echo "  Max parallel: $actual_parallel"
+        echo "  Estimated duration: ${estimated_duration}m"
+        echo "  Matrix: $matrix_json"
+
+    - name: 📊 Generate Matrix Summary
+      shell: bash
+      run: |
+        echo "## 🧮 Dynamic Matrix Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Matrix Type** | ${{ inputs.matrix-type }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Total Jobs** | ${{ steps.generate.outputs.total-jobs }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Max Parallel** | ${{ inputs.max-parallel }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Estimated Duration** | ${{ steps.generate.outputs.estimated-duration }}m |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Include Slow Tests** | ${{ inputs.include-slow-tests }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add matrix preview
+        echo "### 📋 Generated Matrix" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+        echo '${{ steps.generate.outputs.matrix }}' >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

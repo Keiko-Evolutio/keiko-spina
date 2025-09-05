@@ -1,0 +1,221 @@
+name: 'Setup Backend Environment'
+description: 'Sets up Python backend environment with dependencies and configuration'
+branding:
+  icon: 'settings'
+  color: 'blue'
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.12'
+  install-dev-deps:
+    description: 'Install development dependencies'
+    required: false
+    default: 'true'
+  install-test-deps:
+    description: 'Install test dependencies'
+    required: false
+    default: 'true'
+  setup-env-file:
+    description: 'Setup environment file for testing'
+    required: false
+    default: 'true'
+  working-directory:
+    description: 'Working directory for backend'
+    required: false
+    default: 'backend'
+  cache-key-suffix:
+    description: 'Additional suffix for cache key'
+    required: false
+    default: ''
+  extra-packages:
+    description: 'Extra packages to install (space-separated)'
+    required: false
+    default: ''
+
+outputs:
+  python-version:
+    description: 'Python version that was installed'
+    value: ${{ steps.setup-python.outputs.python-version }}
+  cache-hit:
+    description: 'Whether cache was hit'
+    value: ${{ steps.setup-python.outputs.cache-hit }}
+  dependencies-installed:
+    description: 'List of installed dependencies'
+    value: ${{ steps.install-deps.outputs.dependencies }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 💾 Advanced Dependency Caching
+      uses: ./.github/actions/advanced-cache
+      with:
+        cache-type: dependencies
+        cache-paths: |
+          ~/.cache/pip
+          ~/.local/lib/python${{ inputs.python-version }}/site-packages
+          ${{ inputs.working-directory }}/.venv
+        working-directory: ${{ inputs.working-directory }}
+        cache-warming: true
+        max-cache-size: 2048
+
+    - name: 🐍 Setup Python ${{ inputs.python-version }}
+      id: setup-python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'pip'
+        cache-dependency-path: |
+          ${{ inputs.working-directory }}/pyproject.toml
+          ${{ inputs.working-directory }}/requirements*.txt
+
+    - name: 📦 Install Dependencies
+      id: install-deps
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔧 Installing Python dependencies..."
+        
+        # Upgrade pip first
+        python -m pip install --upgrade pip
+        
+        # Build dependency list based on inputs
+        deps_to_install=()
+        
+        # Base installation
+        if [ -f "pyproject.toml" ]; then
+          echo "📋 Found pyproject.toml, installing package..."
+          if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ "${{ inputs.install-test-deps }}" = "true" ]; then
+            deps_to_install+=("-e .[dev,test]")
+          elif [ "${{ inputs.install-dev-deps }}" = "true" ]; then
+            deps_to_install+=("-e .[dev]")
+          elif [ "${{ inputs.install-test-deps }}" = "true" ]; then
+            deps_to_install+=("-e .[test]")
+          else
+            deps_to_install+=("-e .")
+          fi
+        elif [ -f "requirements.txt" ]; then
+          echo "📋 Found requirements.txt, installing..."
+          deps_to_install+=("-r requirements.txt")
+          
+          if [ "${{ inputs.install-dev-deps }}" = "true" ] && [ -f "requirements-dev.txt" ]; then
+            deps_to_install+=("-r requirements-dev.txt")
+          fi
+          
+          if [ "${{ inputs.install-test-deps }}" = "true" ] && [ -f "requirements-test.txt" ]; then
+            deps_to_install+=("-r requirements-test.txt")
+          fi
+        else
+          echo "⚠️ No pyproject.toml or requirements.txt found"
+        fi
+        
+        # Add extra packages if specified
+        if [ -n "${{ inputs.extra-packages }}" ]; then
+          echo "📦 Installing extra packages: ${{ inputs.extra-packages }}"
+          for package in ${{ inputs.extra-packages }}; do
+            deps_to_install+=("$package")
+          done
+        fi
+        
+        # Install all dependencies
+        if [ ${#deps_to_install[@]} -gt 0 ]; then
+          echo "🚀 Installing: ${deps_to_install[*]}"
+          pip install "${deps_to_install[@]}"
+        fi
+        
+        # Output installed packages for verification
+        echo "📋 Installed packages:"
+        pip list --format=freeze > installed-packages.txt
+        cat installed-packages.txt
+        
+        # Set output
+        echo "dependencies=$(pip list --format=freeze | wc -l)" >> $GITHUB_OUTPUT
+        
+        echo "✅ Dependencies installation completed"
+
+    - name: 🔧 Setup Environment File
+      if: inputs.setup-env-file == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔧 Setting up environment file..."
+        
+        # Copy example env file if it exists
+        if [ -f ".env.example" ]; then
+          cp .env.example .env.test
+          echo "📋 Copied .env.example to .env.test"
+        elif [ -f ".env.template" ]; then
+          cp .env.template .env.test
+          echo "📋 Copied .env.template to .env.test"
+        else
+          touch .env.test
+          echo "📋 Created empty .env.test file"
+        fi
+        
+        # Add testing-specific environment variables
+        echo "" >> .env.test
+        echo "# Testing Environment Variables" >> .env.test
+        echo "TESTING=true" >> .env.test
+        echo "ENVIRONMENT=test" >> .env.test
+        echo "LOG_LEVEL=DEBUG" >> .env.test
+        echo "DATABASE_URL=sqlite:///test.db" >> .env.test
+        
+        # Set environment file for subsequent steps
+        echo "ENV_FILE=.env.test" >> $GITHUB_ENV
+        
+        echo "✅ Environment file setup completed"
+
+    - name: 🔍 Verify Installation
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔍 Verifying installation..."
+        
+        # Check Python version
+        python_version=$(python --version)
+        echo "🐍 Python version: $python_version"
+        
+        # Check pip version
+        pip_version=$(pip --version)
+        echo "📦 Pip version: $pip_version"
+        
+        # Check if main package can be imported (if it exists)
+        if [ -f "pyproject.toml" ]; then
+          package_name=$(grep -E "^name\s*=" pyproject.toml | cut -d'"' -f2 | head -1)
+          if [ -n "$package_name" ]; then
+            echo "🧪 Testing import of package: $package_name"
+            python -c "import ${package_name//-/_}; print('✅ Package import successful')" || echo "⚠️ Package import failed"
+          fi
+        fi
+        
+        # Show disk usage
+        echo "💾 Disk usage after installation:"
+        du -sh . || true
+        
+        echo "✅ Installation verification completed"
+
+    - name: 📊 Generate Setup Summary
+      shell: bash
+      run: |
+        echo "## 🐍 Backend Setup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Python Version** | ${{ steps.setup-python.outputs.python-version }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Cache Hit** | ${{ steps.setup-python.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Dependencies Installed** | ${{ steps.install-deps.outputs.dependencies }} packages |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Working Directory** | \`${{ inputs.working-directory }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Dev Dependencies** | ${{ inputs.install-dev-deps }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Test Dependencies** | ${{ inputs.install-test-deps }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Environment File** | ${{ inputs.setup-env-file }} |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -n "${{ inputs.extra-packages }}" ]; then
+          echo "| **Extra Packages** | \`${{ inputs.extra-packages }}\` |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Backend environment ready for use**" >> $GITHUB_STEP_SUMMARY

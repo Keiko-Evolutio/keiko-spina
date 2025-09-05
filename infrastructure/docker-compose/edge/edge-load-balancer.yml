@@ -1,0 +1,42 @@
+# Edge Load Balancer Service
+# Load balancer for edge computing nodes
+
+services:
+  # Edge Load Balancer
+  edge-load-balancer:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/edge/Dockerfile.edge-load-balancer
+      target: development
+    image: keiko/edge-load-balancer:dev
+    container_name: keiko-edge-load-balancer
+    environment:
+      - PYTHONPATH=/app
+      - EDGE_CONFIG_PATH=/app/config/edge-load-balancer.yml
+      - LOG_LEVEL=DEBUG
+      - LOAD_BALANCER_PORT=8080
+      - HEALTH_CHECK_PORT=8081
+      - REGISTRY_URL=http://edge-registry:8080
+      - BALANCING_STRATEGY=round_robin
+    volumes:
+      - edge-load-balancer-data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8088:8080"   # Load Balancer API
+      - "8089:8081"   # Health check
+    depends_on:
+      - edge-registry
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  edge-load-balancer-data:
+    driver: local
+

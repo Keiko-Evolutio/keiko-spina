@@ -1,0 +1,887 @@
+name: 🚀 CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    branches-ignore: [dev]  # Keine Tests/Überprüfungen beim Merge nach dev
+  pull_request:
+    branches: [main, develop]
+    branches-ignore: [dev]  # Keine Tests/Überprüfungen bei PRs nach dev
+  schedule:
+    - cron: "0 3 * * *" # Täglich 03:00 UTC regelmäßige Spec-Validierung
+  workflow_dispatch:
+
+# Minimal permissions für CI/CD Pipeline
+permissions:
+  contents: read          # Read repository contents
+  actions: read          # Read workflow artifacts
+  security-events: write # Upload test results and SARIF files
+
+env:
+  PYTHON_DEFAULT_VERSION: "3.12"
+  COVERAGE_THRESHOLD: 85
+
+jobs:
+  # ============================================================================
+  # CHANGES DETECTION
+  # ============================================================================
+  changes:
+    name: 🔍 Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      docs: ${{ steps.changes.outputs.docs }}
+      ci: ${{ steps.changes.outputs.ci }}
+      tests: ${{ steps.changes.outputs.tests }}
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'pyproject.toml'
+              - 'requirements*.txt'
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+              - '*.md'
+            ci:
+              - '.github/workflows/**'
+              - '.pre-commit-config.yaml'
+            tests:
+              - 'backend/tests/**'
+
+  # ============================================================================
+  # CODE QUALITY GATES
+  # ============================================================================
+  lint:
+    name: 🧹 Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
+    strategy:
+      matrix:
+        check: [ruff-lint, ruff-format, mypy]
+      fail-fast: false
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: 🧹 Run Ruff Linting
+        if: matrix.check == 'ruff-lint'
+        run: |
+          cd backend
+          ruff check . --output-format=github
+
+      - name: 🎨 Run Ruff Formatting
+        if: matrix.check == 'ruff-format'
+        run: |
+          cd backend
+          ruff format --check .
+
+      - name: 🔍 Run MyPy Type Checking
+        if: matrix.check == 'mypy'
+        run: |
+          cd backend
+          mypy . --show-error-codes --pretty
+
+
+
+  # ============================================================================
+  # UNIT TESTS
+  # ============================================================================
+  unit-tests:
+    name: 🧪 Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest]
+        include:
+          # Add Windows and macOS for main Python version only
+          - python-version: "3.12"
+            os: windows-latest
+          - python-version: "3.12"
+            os: macos-latest
+      fail-fast: false
+      max-parallel: 6  # Run all combinations in parallel
+
+    # Unit tests don't need external services
+
+    steps:
+      - name: 📊 Start Performance Monitoring
+        uses: ./.github/actions/performance-monitor
+        with:
+          job-name: "Unit Tests (Python ${{ matrix.python-version }})"
+          operation: start
+          sla-threshold: 900  # 15 minutes
+
+      - name: 🐍 Setup Backend Environment
+        uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ matrix.python-version }}
+          install-dev-deps: true
+          install-test-deps: true
+          working-directory: backend
+
+      - name: 📊 Checkpoint - Environment Setup
+        uses: ./.github/actions/performance-monitor
+        with:
+          job-name: "Unit Tests (Python ${{ matrix.python-version }})"
+          operation: checkpoint
+          checkpoint-name: "Environment Setup Complete"
+
+      - name: 🧪 Run Unit Tests
+        uses: ./.github/actions/run-tests
+        with:
+          test-type: unit
+          test-path: tests/unit/
+          working-directory: backend
+          coverage-enabled: true
+          coverage-threshold: 50
+          max-failures: 10
+
+      - name: 📊 Upload Unit Test Results
+        if: always()
+        uses: ./.github/actions/manage-artifacts
+        with:
+          action: upload
+          name: unit-test-results-${{ matrix.python-version }}
+          path: |
+            backend/pytest-unit-results.xml
+            backend/coverage.xml
+          retention-days: 30
+
+      - name: 🚨 Handle Test Failures
+        if: failure()
+        uses: ./.github/actions/error-handler
+        with:
+          job_name: "Unit Tests (Python ${{ matrix.python-version }})"
+          step_name: "Run Unit Tests"
+          error_message: "Unit tests failed for Python ${{ matrix.python-version }}"
+          log_file: "backend/pytest-unit-results.xml"
+          error_category: "test"
+
+      - name: 📊 Collect Unit Test Metrics
+        if: always()
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "Unit Tests (Python ${{ matrix.python-version }})"
+          step_name: "Metrics Collection"
+          metric_type: "test_execution"
+          tags: "test_type=unit,python_version=${{ matrix.python-version }}"
+
+      - name: 🔍 Compliance Quality Gates
+        uses: ./.github/actions/compliance-quality-gates
+        with:
+          compliance-framework: SOC2
+          quality-threshold: 80
+          security-threshold: 7
+          coverage-threshold: 80
+          fail-on-violation: false  # Don't fail unit tests on compliance issues
+
+      - name: 📊 End Performance Monitoring
+        if: always()
+        uses: ./.github/actions/performance-monitor
+        with:
+          job-name: "Unit Tests (Python ${{ matrix.python-version }})"
+          operation: end
+          sla-threshold: 900
+          enable-regression-detection: true
+
+      - name: 🧹 Cleanup Resources
+        if: always()
+        uses: ./.github/actions/cleanup-action
+        with:
+          cleanup_type: "files"
+          preserve_artifacts: true
+          working-directory: "backend"
+
+  # ============================================================================
+  # INTEGRATION TESTS
+  # ============================================================================
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📊 Start Performance Monitoring
+        uses: ./.github/actions/performance-monitor
+        with:
+          job-name: "Integration Tests"
+          operation: start
+          sla-threshold: 1800  # 30 minutes
+
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Validate Required Secrets
+        run: |
+          echo "## 🔐 Secret Configuration Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check CODECOV_TOKEN (optional for coverage reporting)
+          if [ -n "${{ secrets.CODECOV_TOKEN }}" ]; then
+            echo "| CODECOV_TOKEN | ✅ Configured |" >> $GITHUB_STEP_SUMMARY
+            echo "CODECOV_TOKEN_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "| CODECOV_TOKEN | ⚠️ Missing (coverage upload will be skipped) |" >> $GITHUB_STEP_SUMMARY
+            echo "CODECOV_TOKEN_AVAILABLE=false" >> $GITHUB_ENV
+          fi
+
+          # Check GITHUB_TOKEN (should always be available)
+          if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "| GITHUB_TOKEN | ✅ Configured |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| GITHUB_TOKEN | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+            echo "❌ GITHUB_TOKEN is required but not configured"
+            exit 1
+          fi
+
+          echo "✅ Secret validation completed"
+
+      - name: 🐍 Setup Backend Environment
+        uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          install-dev-deps: true
+          install-test-deps: true
+          working-directory: backend
+          extra-packages: "psycopg2-binary redis"
+
+      - name: 🔧 Setup Integration Test Environment
+        shell: bash
+        working-directory: backend
+        run: |
+          echo "🔧 Setting up integration test environment..."
+
+          # Add integration-specific environment variables
+          echo "DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db" >> .env.test
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env.test
+          echo "INTEGRATION_TESTING=true" >> .env.test
+
+      - name: 🔗 Run Integration Tests with Retry
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            python -m pytest tests/integration/ \
+              --cov=. \
+              --cov-report=xml \
+              --cov-report=term-missing \
+              --junit-xml=pytest-integration-results.xml \
+              -v \
+              --tb=short \
+              --maxfail=5 \
+              -m "integration"
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_minutes: 15
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📊 Upload Integration Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            backend/pytest-integration-results.xml
+            backend/coverage.xml
+          retention-days: 30
+
+      - name: 🚨 Handle Integration Test Failures
+        if: failure()
+        uses: ./.github/actions/error-handler
+        with:
+          job_name: "Integration Tests"
+          step_name: "Run Integration Tests with Retry"
+          error_message: "Integration tests failed - may indicate issues with external dependencies"
+          log_file: "backend/pytest-integration-results.xml"
+          error_category: "test"
+
+      - name: 📊 Collect Integration Test Metrics
+        if: always()
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "Integration Tests"
+          step_name: "Metrics Collection"
+          metric_type: "test_execution"
+          tags: "test_type=integration,has_external_deps=true"
+
+      - name: 🧹 Cleanup Integration Test Resources
+        if: always()
+        uses: ./.github/actions/cleanup-action
+        with:
+          cleanup_type: "all"
+          preserve_artifacts: true
+          working_directory: "backend" \
+            --maxfail=5 \
+            -m "integration"
+
+      - name: 📊 Upload Coverage to Codecov
+        if: matrix.python-version == env.PYTHON_DEFAULT_VERSION && env.CODECOV_TOKEN_AVAILABLE == 'true'
+        uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false  # Don't fail CI if upload fails
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: ⚠️ Codecov Token Missing
+        if: matrix.python-version == env.PYTHON_DEFAULT_VERSION && env.CODECOV_TOKEN_AVAILABLE == 'false'
+        run: |
+          echo "⚠️ CODECOV_TOKEN not configured - skipping coverage upload"
+          echo "Configure CODECOV_TOKEN secret for coverage reporting"
+          echo "Coverage data is still available in artifacts"
+
+      - name: 📊 Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-python-${{ matrix.python-version }}
+          path: |
+            backend/pytest-*.xml
+            backend/coverage.xml
+            backend/htmlcov/
+          retention-days: 30
+
+  # ============================================================================
+  # PARALLEL FAST TESTS GROUP
+  # ============================================================================
+  fast-tests:
+    name: 🚀 Fast Tests (${{ matrix.test-type }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
+
+    strategy:
+      matrix:
+        test-type: [contract, specs, conformance]
+        include:
+          - test-type: contract
+            test-name: "📋 API Contract Tests"
+            test-path: "tests/contract/"
+            timeout: 15
+          - test-type: specs
+            test-name: "📋 Spec Validation"
+            test-path: "tests/specs/"
+            timeout: 10
+          - test-type: conformance
+            test-name: "📋 Conformance Tests"
+            test-path: "tests/conformance/"
+            timeout: 20
+      fail-fast: false
+      max-parallel: 3
+
+    steps:
+      - name: 🐍 Setup Backend Environment
+        uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          install-dev-deps: true
+          install-test-deps: true
+          working-directory: backend
+
+      - name: 🧪 Run ${{ matrix.test-name }}
+        uses: ./.github/actions/run-tests
+        with:
+          test-type: ${{ matrix.test-type }}
+          test-path: ${{ matrix.test-path }}
+          working-directory: backend
+          coverage-enabled: false
+          timeout-minutes: ${{ matrix.timeout }}
+
+      - name: 📊 Upload Test Results
+        if: always()
+        uses: ./.github/actions/manage-artifacts
+        with:
+          action: upload
+          name: ${{ matrix.test-type }}-test-results
+          path: backend/pytest-${{ matrix.test-type }}-results.xml
+          retention-days: 30
+
+  # ============================================================================
+  # API CONTRACT TESTING (Legacy - will be removed)
+  # ============================================================================
+  contract-tests:
+    name: 📋 API Contract Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: false  # Disabled - now handled by fast-tests
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: 📋 Validate OpenAPI Specification
+        run: |
+          cd backend
+          python -c "
+          import yaml
+          from openapi_spec_validator import validate_spec
+
+          with open('../docs/api/kei_mcp_openapi.yaml', 'r') as f:
+              spec = yaml.safe_load(f)
+
+          try:
+              validate_spec(spec)
+              print('✅ OpenAPI specification is valid')
+          except Exception as e:
+              print(f'❌ OpenAPI specification validation failed: {e}')
+              exit(1)
+          "
+
+      - name: 🧪 Run Contract Tests
+        run: |
+          cd backend
+          pytest tests/ \
+            -v \
+            --tb=short \
+            -m "contract" \
+            --junit-xml=contract-test-results.xml
+
+      - name: 📊 Upload Contract Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: backend/contract-test-results.xml
+          retention-days: 30
+
+  # ============================================================================
+  # SPEC VALIDATION (AsyncAPI / Proto) - SCHEMA/IMPL DRIFT CHECK
+  # ============================================================================
+  specs:
+    name: 📋 Spec Validation (AsyncAPI/Proto)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.ci == 'true'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Spec Validation Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyyaml grpcio-tools
+
+      - name: 🔍 Validate AsyncAPI & Proto Specs
+        run: |
+          python scripts/validate_specs.py
+
+  # ============================================================================
+  # MCP CONFORMANCE TESTS
+  # ============================================================================
+  mcp-conformance:
+    name: 🔌 MCP Protocol Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: 🔌 Run MCP Conformance Tests
+        run: |
+          cd backend
+          pytest tests/ \
+            -v \
+            --tb=short \
+            -m "mcp" \
+            --junit-xml=mcp-conformance-results.xml
+
+      - name: 📊 Upload MCP Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-conformance-results
+          path: backend/mcp-conformance-results.xml
+          retention-days: 30
+
+
+
+  # ============================================================================
+  # E2E TESTS
+  # ============================================================================
+  e2e-tests:
+    name: 🌐 E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 🔧 Setup Test Environment
+        run: |
+          cd backend
+          cp .env.example .env.test || echo "No .env.example found"
+          echo "TESTING=true" >> .env.test
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env.test
+
+      - name: 🌐 Run E2E Tests with Retry
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            pytest tests/e2e/ \
+              --junit-xml=pytest-e2e-results.xml \
+              -v \
+              --tb=short \
+              --maxfail=3 \
+              -m "not slow"
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 20
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📊 Upload E2E Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: backend/pytest-e2e-results.xml
+          retention-days: 30
+
+      - name: 🚨 Handle E2E Test Failures
+        if: failure()
+        uses: ./.github/actions/error-handler
+        with:
+          job_name: "E2E Tests"
+          step_name: "Run E2E Tests with Retry"
+          error_message: "E2E tests failed - browser automation or network issues"
+          log_file: "backend/pytest-e2e-results.xml"
+          error_category: "test"
+          create_issue: "true"
+
+      - name: 📊 Collect E2E Test Metrics
+        if: always()
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "E2E Tests"
+          step_name: "Metrics Collection"
+          metric_type: "test_execution"
+          tags: "test_type=e2e,browser_automation=true"
+
+      - name: 🧹 Cleanup E2E Test Resources
+        if: always()
+        uses: ./.github/actions/cleanup-action
+        with:
+          cleanup_type: "all"
+          preserve_artifacts: true
+          force_cleanup: "true"
+          working_directory: "backend"
+
+  # ============================================================================
+  # CONFORMANCE TESTS
+  # ============================================================================
+  conformance-tests:
+    name: 📋 Conformance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 📋 Run Conformance Tests
+        run: |
+          cd backend
+          pytest tests/e2e/conformance/ \
+            --junit-xml=pytest-conformance-results.xml \
+            -v \
+            --tb=short \
+            --maxfail=5
+
+      - name: 📊 Upload Conformance Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-test-results
+          path: backend/pytest-conformance-results.xml
+          retention-days: 30
+
+
+
+  # ============================================================================
+  # BUILD VALIDATION
+  # ============================================================================
+  build:
+    name: 🏗️ Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, unit-tests]  # Only depend on critical tests for faster feedback
+    if: always() && (needs.lint.result == 'success' || needs.lint.result == 'skipped') && (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped')
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 💾 Advanced Build Caching
+        uses: ./.github/actions/advanced-cache
+        with:
+          cache-type: build
+          cache-paths: |
+            backend/dist
+            backend/build
+            backend/*.egg-info
+            ~/.cache/pip
+          working-directory: backend
+          cache-warming: true
+
+      - name: 🐍 Setup Backend Environment
+        uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          install-dev-deps: false
+          install-test-deps: false
+          working-directory: backend
+          extra-packages: "build hatchling"
+
+      - name: 🏗️ Build Package
+        run: |
+          cd backend
+          python -m build
+
+      - name: 📊 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: backend/dist/
+          retention-days: 30
+
+  # ============================================================================
+  # SUMMARY
+  # ============================================================================
+  ci-success:
+    name: ✅ CI Success
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      [changes, lint, unit-tests, integration-tests, e2e-tests, conformance-tests, contract-tests, mcp-conformance, build]
+    if: always()
+
+    steps:
+      - name: 📊 Check Results
+        run: |
+          echo "Changes Detection: ${{ needs.changes.result }}"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "E2E Tests: ${{ needs.e2e-tests.result }}"
+          echo "Conformance Tests: ${{ needs.conformance-tests.result }}"
+          echo "Contract Tests: ${{ needs.contract-tests.result }}"
+          echo "MCP Conformance: ${{ needs.mcp-conformance.result }}"
+          echo "Build: ${{ needs.build.result }}"
+
+      - name: ✅ Success
+        if: |
+          needs.changes.result == 'success' &&
+          (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
+          (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped') &&
+          (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped') &&
+          (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') &&
+          (needs.conformance-tests.result == 'success' || needs.conformance-tests.result == 'skipped') &&
+          (needs.contract-tests.result == 'success' || needs.contract-tests.result == 'skipped') &&
+          (needs.mcp-conformance.result == 'success' || needs.mcp-conformance.result == 'skipped') &&
+          (needs.build.result == 'success' || needs.build.result == 'skipped')
+        run: |
+          echo "🎉 All CI checks passed successfully!"
+
+      - name: ❌ Failure
+        if: |
+          needs.changes.result == 'failure' ||
+          needs.lint.result == 'failure' ||
+          needs.unit-tests.result == 'failure' ||
+          needs.integration-tests.result == 'failure' ||
+          needs.e2e-tests.result == 'failure' ||
+          needs.conformance-tests.result == 'failure' ||
+          needs.contract-tests.result == 'failure' ||
+          needs.mcp-conformance.result == 'failure' ||
+          needs.build.result == 'failure'
+        run: |
+          echo "❌ CI checks failed. Please review the failed jobs above."
+          exit 1
+
+  # ============================================================================
+  # GLOBAL CLEANUP
+  # ============================================================================
+  cleanup:
+    name: 🧹 Global Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      [changes, lint, unit-tests, integration-tests, e2e-tests, conformance-tests, contract-tests, mcp-conformance, build, ci-success]
+    if: always()
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧹 Comprehensive Cleanup
+        uses: ./.github/actions/cleanup-action
+        with:
+          cleanup_type: "all"
+          preserve_artifacts: false
+          force_cleanup: "true"
+
+      - name: 📊 Generate Workflow Summary
+        run: |
+          echo "## 🎯 Workflow Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Changes Detection | ${{ needs.changes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Conformance Tests | ${{ needs.conformance-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Contract Tests | ${{ needs.contract-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Conformance | ${{ needs.mcp-conformance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CI Success | ${{ needs.ci-success.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Calculate overall status
+          if [ "${{ needs.ci-success.result }}" = "success" ]; then
+            echo "### ✅ Workflow Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Workflow Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow Run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,137 @@
+groups:
+  - interval: 30s
+    name: keiko_test_alerts
+    rules:
+      # SLA-basierte Alerts entsprechend Anforderung
+      - name: keiko_sla_alerts
+        rules:
+          - alert: ApiResponseTimeWarning
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "API Antwortzeit > 2s"
+              description: "P95 Antwortzeit {{ $value }}s"
+
+          - alert: ApiResponseTimeCritical
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "API Antwortzeit > 5s"
+              description: "P95 Antwortzeit {{ $value }}s"
+
+          - alert: WebSocketConnectionFailuresWarning
+            expr: (rate(keiko_websocket_connection_errors_total[5m])) / (rate(keiko_websocket_connection_attempts_total[5m])) > 0.05
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "WebSocket Verbindungsfehler > 5%"
+              description: "Rate {{ $value | humanizePercentage }}"
+
+          - alert: WebSocketConnectionFailuresCritical
+            expr: (rate(keiko_websocket_connection_errors_total[5m])) / (rate(keiko_websocket_connection_attempts_total[5m])) > 0.10
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "WebSocket Verbindungsfehler > 10%"
+              description: "Rate {{ $value | humanizePercentage }}"
+
+          - alert: WebhookDeliveryFailureWarning
+            expr: (rate(webhook_errors_total[5m])) / (rate(webhook_deliveries_total[5m])) > 0.01
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Webhook Zustellfehler > 1%"
+              description: "Rate {{ $value | humanizePercentage }}"
+
+          - alert: WebhookDeliveryFailureCritical
+            expr: (rate(webhook_errors_total[5m])) / (rate(webhook_deliveries_total[5m])) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Webhook Zustellfehler > 5%"
+              description: "Rate {{ $value | humanizePercentage }}"
+
+          - alert: SystemMemoryUsageWarning
+            expr: keiko_system_memory_percent > 80
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Speicherauslastung > 80%"
+              description: "{{ $value }}%"
+
+          - alert: SystemMemoryUsageCritical
+            expr: keiko_system_memory_percent > 90
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Speicherauslastung > 90%"
+              description: "{{ $value }}%"
+
+          - alert: ErrorRateWarning
+            expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.01
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Error Rate > 1%"
+              description: "{{ $value | humanizePercentage }}"
+
+          - alert: ErrorRateCritical
+            expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.05
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Error Rate > 5%"
+              description: "{{ $value | humanizePercentage }}"
+      - alert: UnitTestFailureRateHigh
+        annotations:
+          description:
+            Unit test failure rate is {{ $value | humanizePercentage }} for
+            the last 5 minutes
+          runbook_url: https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#unit-tests
+          summary: Unit test failure rate is high
+        expr:
+          (github_actions_test_failures{category="unit"} / github_actions_test_total{category="unit"})
+          > 0.05
+        for: 5m
+        labels:
+          category: unit
+          severity: warning
+          team: keiko-dev
+      - alert: SecurityTestFailure
+        annotations:
+          description:
+            "{{ $value }} security tests are failing - immediate attention
+            required"
+          runbook_url: https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#security-tests
+          summary: Security tests are failing
+        expr: github_actions_test_failures{category="security"} > 0
+        for: 1m
+        labels:
+          category: security
+          severity: critical
+          team: keiko-dev
+      - alert: ConformanceTestFailure
+        annotations:
+          description:
+            "{{ $value }} conformance tests are failing - protocol compliance
+            may be broken"
+          runbook_url: https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#conformance-tests
+          summary: Conformance tests are failing
+        expr: github_actions_test_failures{category="conformance"} > 0
+        for: 1m
+        labels:
+          category: conformance
+          severity: critical
+          team: keiko-dev

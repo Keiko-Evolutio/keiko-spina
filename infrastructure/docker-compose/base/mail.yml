@@ -1,0 +1,32 @@
+# MailHog Email Testing Service
+# SMTP server and web interface for email testing
+
+services:
+  # MailHog - Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: keiko-mailhog
+    environment:
+      - MH_STORAGE=maildir
+      - MH_MAILDIR_PATH=/maildir
+    volumes:
+      - mailhog-data:/maildir
+    ports:
+      - "1025:1025"   # SMTP server
+      - "8025:8025"   # Web interface
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    profiles:
+      - tools
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8025/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mailhog-data:
+    driver: local
+

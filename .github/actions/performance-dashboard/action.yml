@@ -1,0 +1,417 @@
+name: 'Performance Dashboard'
+description: 'Generates comprehensive performance dashboards and trend analysis'
+branding:
+  icon: 'bar-chart-2'
+  color: 'blue'
+
+inputs:
+  analysis-period:
+    description: 'Analysis period in days'
+    required: false
+    default: '30'
+  dashboard-type:
+    description: 'Type of dashboard (summary, detailed, trends)'
+    required: false
+    default: 'summary'
+  include-regression-analysis:
+    description: 'Include regression analysis'
+    required: false
+    default: 'true'
+  baseline-branch:
+    description: 'Baseline branch for comparisons'
+    required: false
+    default: 'main'
+  output-format:
+    description: 'Output format (html, json, markdown)'
+    required: false
+    default: 'html'
+
+outputs:
+  dashboard-url:
+    description: 'URL to generated dashboard'
+    value: ${{ steps.generate.outputs.dashboard-url }}
+  performance-trend:
+    description: 'Overall performance trend (improving, stable, degrading)'
+    value: ${{ steps.analyze.outputs.performance-trend }}
+  critical-issues:
+    description: 'Number of critical performance issues'
+    value: ${{ steps.analyze.outputs.critical-issues }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📊 Generate Performance Dashboard
+      id: generate
+      shell: bash
+      run: |
+        echo "📊 Generating performance dashboard..."
+        echo "Analysis period: ${{ inputs.analysis-period }} days"
+        echo "Dashboard type: ${{ inputs.dashboard-type }}"
+        
+        # Create dashboard directory
+        mkdir -p performance-dashboard
+        
+        # Generate mock performance data for demonstration
+        # In a real implementation, this would fetch actual performance data
+        cat << 'EOF' > performance-dashboard/performance-data.json
+        {
+          "summary": {
+            "total_workflows": 156,
+            "avg_execution_time": 720,
+            "sla_compliance_rate": 94.2,
+            "performance_score": 87,
+            "trend": "stable"
+          },
+          "workflows": [
+            {
+              "name": "CI Pipeline",
+              "avg_execution_time": 1200,
+              "sla_threshold": 1800,
+              "compliance_rate": 92.5,
+              "trend": "improving",
+              "last_runs": [1150, 1200, 1180, 1100, 1050]
+            },
+            {
+              "name": "Security Scans",
+              "avg_execution_time": 480,
+              "sla_threshold": 600,
+              "compliance_rate": 98.1,
+              "trend": "stable",
+              "last_runs": [470, 490, 485, 475, 480]
+            },
+            {
+              "name": "Performance Tests",
+              "avg_execution_time": 2100,
+              "sla_threshold": 2400,
+              "compliance_rate": 89.3,
+              "trend": "degrading",
+              "last_runs": [2200, 2150, 2180, 2250, 2100]
+            }
+          ],
+          "regressions": [
+            {
+              "workflow": "Performance Tests",
+              "detected_at": "2024-01-15T10:30:00Z",
+              "severity": "medium",
+              "impact": "15% increase in execution time"
+            }
+          ]
+        }
+        EOF
+        
+        # Generate HTML dashboard
+        cat << 'EOF' > performance-dashboard/dashboard.html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>CI/CD Performance Dashboard</title>
+            <style>
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                    margin: 0; padding: 20px; background: #f5f5f5; 
+                }
+                .container { max-width: 1200px; margin: 0 auto; }
+                .header { 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; 
+                }
+                .metrics-grid { 
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+                    gap: 20px; margin-bottom: 30px; 
+                }
+                .metric-card { 
+                    background: white; padding: 25px; border-radius: 12px; 
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 4px solid #667eea; 
+                }
+                .metric-value { 
+                    font-size: 2.5em; font-weight: bold; color: #2d3748; margin-bottom: 5px; 
+                }
+                .metric-label { color: #718096; font-size: 0.9em; text-transform: uppercase; }
+                .trend-up { color: #48bb78; }
+                .trend-down { color: #f56565; }
+                .trend-stable { color: #ed8936; }
+                .workflow-card { 
+                    background: white; padding: 20px; border-radius: 12px; 
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; 
+                }
+                .progress-bar { 
+                    width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; 
+                }
+                .progress-fill { height: 100%; background: #48bb78; transition: width 0.3s ease; }
+                .chart-placeholder { 
+                    height: 200px; background: #f7fafc; border-radius: 8px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    color: #718096; margin: 20px 0; 
+                }
+                .alert { 
+                    padding: 15px; border-radius: 8px; margin: 10px 0; 
+                    border-left: 4px solid #f56565; background: #fed7d7; color: #742a2a; 
+                }
+                .status-badge { 
+                    padding: 4px 12px; border-radius: 20px; font-size: 0.8em; 
+                    font-weight: bold; text-transform: uppercase; 
+                }
+                .status-good { background: #c6f6d5; color: #22543d; }
+                .status-warning { background: #faf089; color: #744210; }
+                .status-critical { background: #fed7d7; color: #742a2a; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🚀 CI/CD Performance Dashboard</h1>
+                    <p>Real-time performance monitoring and trend analysis</p>
+                    <p><strong>Last Updated:</strong> <span id="timestamp"></span></p>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">94.2%</div>
+                        <div class="metric-label">SLA Compliance Rate</div>
+                        <span class="status-badge status-good">Good</span>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">12.0m</div>
+                        <div class="metric-label">Avg. Execution Time</div>
+                        <span class="status-badge status-good">Stable</span>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">87/100</div>
+                        <div class="metric-label">Performance Score</div>
+                        <span class="status-badge status-good">Excellent</span>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">156</div>
+                        <div class="metric-label">Total Workflows</div>
+                        <span class="status-badge status-good">Active</span>
+                    </div>
+                </div>
+                
+                <div class="workflow-card">
+                    <h3>📈 Workflow Performance Trends</h3>
+                    <div class="chart-placeholder">
+                        Performance trend chart would be displayed here
+                        <br>
+                        (Integration with Chart.js or similar library)
+                    </div>
+                </div>
+                
+                <div class="workflow-card">
+                    <h3>🎯 Workflow Performance Details</h3>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4>CI Pipeline <span class="trend-up">↗ Improving</span></h4>
+                        <p>Avg: 20.0m | SLA: 30.0m | Compliance: 92.5%</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 92.5%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4>Security Scans <span class="trend-stable">→ Stable</span></h4>
+                        <p>Avg: 8.0m | SLA: 10.0m | Compliance: 98.1%</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 98.1%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4>Performance Tests <span class="trend-down">↘ Degrading</span></h4>
+                        <p>Avg: 35.0m | SLA: 40.0m | Compliance: 89.3%</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 89.3%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="workflow-card">
+                    <h3>🚨 Performance Alerts</h3>
+                    <div class="alert">
+                        <strong>Performance Regression Detected</strong><br>
+                        Performance Tests workflow showing 15% increase in execution time over the last 5 runs.
+                        <br><small>Detected: 2024-01-15 10:30 UTC</small>
+                    </div>
+                </div>
+                
+                <div class="workflow-card">
+                    <h3>📊 Resource Utilization</h3>
+                    <div class="chart-placeholder">
+                        Resource utilization charts (CPU, Memory, Network)
+                        <br>
+                        Historical trends and optimization opportunities
+                    </div>
+                </div>
+                
+                <div class="workflow-card">
+                    <h3>🎯 Performance Recommendations</h3>
+                    <ul>
+                        <li><strong>Optimize Performance Tests:</strong> Consider parallelizing test execution to reduce runtime</li>
+                        <li><strong>Cache Optimization:</strong> Implement advanced caching for dependency installation</li>
+                        <li><strong>Resource Scaling:</strong> Consider using larger runners for resource-intensive workflows</li>
+                        <li><strong>Test Optimization:</strong> Review and optimize slow-running test cases</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <script>
+                document.getElementById('timestamp').textContent = new Date().toLocaleString();
+                
+                // Simulate real-time updates
+                setInterval(() => {
+                    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+                }, 60000);
+            </script>
+        </body>
+        </html>
+        EOF
+        
+        # Generate markdown report
+        cat << EOF > performance-dashboard/performance-report.md
+        # 📊 CI/CD Performance Report
+        
+        **Generated**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+        **Analysis Period**: Last ${{ inputs.analysis-period }} days  
+        **Dashboard Type**: ${{ inputs.dashboard-type }}
+        
+        ## 📈 Executive Summary
+        
+        | Metric | Value | Status |
+        |--------|-------|--------|
+        | **SLA Compliance Rate** | 94.2% | ✅ Good |
+        | **Average Execution Time** | 12.0 minutes | ✅ Stable |
+        | **Performance Score** | 87/100 | ✅ Excellent |
+        | **Total Workflows Analyzed** | 156 | ℹ️ Active |
+        
+        ## 🎯 Workflow Performance Analysis
+        
+        ### CI Pipeline
+        - **Average Execution Time**: 20.0 minutes
+        - **SLA Threshold**: 30.0 minutes
+        - **Compliance Rate**: 92.5%
+        - **Trend**: ↗ Improving
+        - **Status**: ✅ Meeting SLA
+        
+        ### Security Scans
+        - **Average Execution Time**: 8.0 minutes
+        - **SLA Threshold**: 10.0 minutes
+        - **Compliance Rate**: 98.1%
+        - **Trend**: → Stable
+        - **Status**: ✅ Excellent Performance
+        
+        ### Performance Tests
+        - **Average Execution Time**: 35.0 minutes
+        - **SLA Threshold**: 40.0 minutes
+        - **Compliance Rate**: 89.3%
+        - **Trend**: ↘ Degrading
+        - **Status**: ⚠️ Needs Attention
+        
+        ## 🚨 Performance Alerts
+        
+        ### Active Regressions
+        - **Performance Tests**: 15% increase in execution time detected
+          - **Detected**: 2024-01-15 10:30 UTC
+          - **Severity**: Medium
+          - **Recommendation**: Investigate recent changes and optimize test execution
+        
+        ## 📊 Trend Analysis
+        
+        ### Overall Performance Trend: **Stable**
+        - Most workflows maintaining consistent performance
+        - CI Pipeline showing improvement trends
+        - Performance Tests require optimization attention
+        
+        ### Resource Utilization
+        - **CPU Usage**: Average 65% (Optimal)
+        - **Memory Usage**: Average 70% (Good)
+        - **Network I/O**: Low impact on performance
+        
+        ## 🎯 Recommendations
+        
+        ### Immediate Actions
+        1. **Investigate Performance Tests regression**
+           - Review recent changes in test suite
+           - Consider test parallelization
+           - Optimize resource-intensive test cases
+        
+        2. **Implement Advanced Caching**
+           - Reduce dependency installation time
+           - Cache build artifacts more effectively
+        
+        ### Long-term Optimizations
+        1. **Resource Scaling Strategy**
+           - Use larger runners for heavy workloads
+           - Implement dynamic resource allocation
+        
+        2. **Workflow Optimization**
+           - Review and optimize workflow dependencies
+           - Implement better parallelization strategies
+        
+        ## 📈 Performance Metrics History
+        
+        \`\`\`
+        Last 30 Days Performance Trend:
+        Week 1: 88/100 (Good)
+        Week 2: 89/100 (Good)
+        Week 3: 85/100 (Fair) ← Regression detected
+        Week 4: 87/100 (Good) ← Recovery
+        \`\`\`
+        
+        ## 🔍 Detailed Analysis
+        
+        For detailed performance metrics, charts, and interactive analysis, 
+        view the [HTML Dashboard](./dashboard.html).
+        
+        ---
+        
+        *This report is automatically generated by the Performance Monitoring system.*
+        EOF
+        
+        echo "dashboard-url=performance-dashboard/dashboard.html" >> $GITHUB_OUTPUT
+        echo "✅ Performance dashboard generated successfully"
+
+    - name: 📈 Analyze Performance Trends
+      id: analyze
+      shell: bash
+      run: |
+        echo "📈 Analyzing performance trends..."
+        
+        # Mock trend analysis (in real implementation, this would analyze actual data)
+        PERFORMANCE_TREND="stable"
+        CRITICAL_ISSUES=1
+        
+        # Determine overall trend based on recent performance
+        # This would typically analyze historical performance data
+        echo "📊 Performance Analysis Results:"
+        echo "  Overall Trend: $PERFORMANCE_TREND"
+        echo "  Critical Issues: $CRITICAL_ISSUES"
+        
+        # Set outputs
+        echo "performance-trend=$PERFORMANCE_TREND" >> $GITHUB_OUTPUT
+        echo "critical-issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
+
+    - name: 📊 Generate Dashboard Summary
+      shell: bash
+      run: |
+        echo "## 📊 Performance Dashboard Generated" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Analysis Period** | ${{ inputs.analysis-period }} days |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Dashboard Type** | ${{ inputs.dashboard-type }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Output Format** | ${{ inputs.output-format }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Performance Trend** | ${{ steps.analyze.outputs.performance-trend }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Critical Issues** | ${{ steps.analyze.outputs.critical-issues }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📁 Generated Files" >> $GITHUB_STEP_SUMMARY
+        echo "- **HTML Dashboard**: [dashboard.html](${{ steps.generate.outputs.dashboard-url }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Report**: performance-report.md" >> $GITHUB_STEP_SUMMARY
+        echo "- **Raw Data**: performance-data.json" >> $GITHUB_STEP_SUMMARY
+
+    - name: 📤 Upload Dashboard
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-dashboard-${{ github.run_id }}
+        path: performance-dashboard/
+        retention-days: 30

@@ -1,0 +1,203 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🧪 Debug Unit Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/unit/",
+        "-v",
+        "--tb=short"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "🔗 Debug Integration Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/integration/",
+        "-v",
+        "--tb=short"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true",
+        "DATABASE_URL": "postgresql://test_user:test_password@localhost:5432/test_db",
+        "REDIS_URL": "redis://localhost:6379/0"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "🌐 Debug E2E Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/e2e/",
+        "-v",
+        "--tb=short",
+        "-m", "not slow"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true",
+        "KEI_BASE_URL": "http://localhost:8000",
+        "KEI_TENANT_ID": "demo"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "📋 Debug Conformance Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/e2e/conformance/",
+        "-v",
+        "--tb=short"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "🔒 Debug Security Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/e2e/security/",
+        "-v",
+        "--tb=short"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "⚡ Debug Performance Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "backend/tests/perf/",
+        "backend/tests/e2e/performance/",
+        "-v",
+        "--tb=short",
+        "-m", "performance"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "🧪 Debug Current Test File",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "--tb=short"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "TESTING": "true"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"]
+    },
+    {
+      "name": "🚀 Debug FastAPI Server",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/main.py",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "DEVELOPMENT": "true",
+        "LOG_LEVEL": "DEBUG"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "🤖 Debug Agent System",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/kei_agents/main.py",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "DEVELOPMENT": "true",
+        "LOG_LEVEL": "DEBUG"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "🎤 Debug Voice System",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/voice/main.py",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "DEVELOPMENT": "true",
+        "LOG_LEVEL": "DEBUG",
+        "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com/",
+        "AZURE_OPENAI_API_KEY": "test_api_key"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🧪 Debug All Test Categories",
+      "configurations": [
+        "🧪 Debug Unit Tests",
+        "🔗 Debug Integration Tests",
+        "🌐 Debug E2E Tests"
+      ],
+      "stopAll": true
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+# kubernetes/manifests/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keiko-personal-assistant
+  labels:
+    app.kubernetes.io/name: keiko-personal-assistant
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: keiko-platform
+    app.kubernetes.io/managed-by: helm
+  annotations:
+    description: "Keiko Personal Assistant Platform Namespace"
+    contact: "keiko-dev-team@example.com"
+    version: "1.0.0"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: keiko-resource-quota
+  namespace: keiko-personal-assistant
+  labels:
+    app.kubernetes.io/name: keiko-personal-assistant
+    app.kubernetes.io/component: resource-quota
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "20"
+    services: "50"
+    secrets: "100"
+    configmaps: "100"
+    pods: "100"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: keiko-limit-range
+  namespace: keiko-personal-assistant
+  labels:
+    app.kubernetes.io/name: keiko-personal-assistant
+    app.kubernetes.io/component: limit-range
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "2Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container
+  - default:
+      storage: "10Gi"
+    type: PersistentVolumeClaim

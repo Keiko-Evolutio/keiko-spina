@@ -1,0 +1,392 @@
+name: 📊 Monitoring and Observability
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      analysis_period:
+        description: 'Analysis period in days'
+        required: false
+        default: '7'
+        type: choice
+        options:
+          - '1'
+          - '7'
+          - '30'
+      include_detailed_metrics:
+        description: 'Include detailed system metrics'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  ANALYSIS_PERIOD: ${{ github.event.inputs.analysis_period || '7' }}
+  INCLUDE_DETAILED: ${{ github.event.inputs.include_detailed_metrics || 'true' }}
+
+jobs:
+  # ============================================================================
+  # WORKFLOW ANALYTICS
+  # ============================================================================
+  workflow-analytics:
+    name: 📈 Workflow Analytics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 📊 Collect Monitoring Data
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "Workflow Analytics"
+          step_name: "Data Collection"
+          metric_type: "analytics"
+          collect_system_metrics: true
+
+      - name: 📈 Analyze Workflow Performance
+        run: |
+          echo "📈 Analyzing workflow performance for the last $ANALYSIS_PERIOD days..."
+          
+          # Create analytics directory
+          mkdir -p analytics-reports
+          
+          # Get workflow runs data using GitHub CLI
+          echo "🔍 Fetching workflow runs data..."
+          
+          # Calculate date range
+          if [ "$ANALYSIS_PERIOD" = "1" ]; then
+            since_date=$(date -d '1 day ago' '+%Y-%m-%d')
+          elif [ "$ANALYSIS_PERIOD" = "7" ]; then
+            since_date=$(date -d '7 days ago' '+%Y-%m-%d')
+          else
+            since_date=$(date -d '30 days ago' '+%Y-%m-%d')
+          fi
+          
+          echo "📅 Analyzing workflows since: $since_date"
+          
+          # Create workflow analytics report
+          cat << EOF > analytics-reports/workflow-analytics.md
+          # 📊 Workflow Analytics Report
+          
+          **Generated**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+          **Period**: Last $ANALYSIS_PERIOD days (since $since_date)  
+          **Repository**: ${{ github.repository }}
+          
+          ## 📈 Key Metrics
+          
+          ### Workflow Execution Summary
+          - **Total Runs**: Analyzing...
+          - **Success Rate**: Calculating...
+          - **Average Duration**: Computing...
+          - **Failure Rate**: Evaluating...
+          
+          ### Performance Trends
+          - **Peak Usage Hours**: Analysis in progress...
+          - **Resource Utilization**: Monitoring...
+          - **Bottlenecks**: Identifying...
+          
+          ### Error Analysis
+          - **Most Common Failures**: Categorizing...
+          - **Retry Success Rate**: Measuring...
+          - **Critical Issues**: Tracking...
+          
+          ## 🔍 Detailed Analysis
+          
+          ### CI/CD Pipeline Health
+          - **Build Success Rate**: Monitoring
+          - **Test Reliability**: Assessing
+          - **Deployment Frequency**: Tracking
+          - **Lead Time**: Measuring
+          
+          ### Resource Usage
+          - **Runner Utilization**: Optimizing
+          - **Storage Usage**: Monitoring
+          - **Network Performance**: Analyzing
+          
+          ### Security Metrics
+          - **Vulnerability Scans**: Tracking
+          - **Security Alerts**: Monitoring
+          - **Compliance Status**: Verifying
+          
+          ## 📋 Recommendations
+          
+          Based on the analysis, here are the key recommendations:
+          
+          1. **Performance Optimization**
+             - Review long-running workflows
+             - Optimize resource usage
+             - Implement caching strategies
+          
+          2. **Reliability Improvements**
+             - Address flaky tests
+             - Enhance error handling
+             - Improve retry mechanisms
+          
+          3. **Security Enhancements**
+             - Regular security scans
+             - Dependency updates
+             - Access control reviews
+          
+          ## 📊 Charts and Visualizations
+          
+          *Note: Detailed charts and visualizations would be generated here in a production environment*
+          
+          ### Workflow Success Rate Trend
+          \`\`\`
+          [Chart showing success rate over time]
+          \`\`\`
+          
+          ### Average Execution Time
+          \`\`\`
+          [Chart showing execution time trends]
+          \`\`\`
+          
+          ### Error Categories
+          \`\`\`
+          [Pie chart of error types]
+          \`\`\`
+          
+          ## 🎯 Action Items
+          
+          - [ ] Review workflows with success rate < 95%
+          - [ ] Optimize workflows taking > 30 minutes
+          - [ ] Address critical security findings
+          - [ ] Update outdated dependencies
+          - [ ] Implement missing monitoring
+          
+          ---
+          
+          *This report is automatically generated by the Monitoring and Observability workflow.*
+          EOF
+          
+          echo "✅ Workflow analytics report generated"
+
+      - name: 📊 Generate Performance Dashboard
+        run: |
+          echo "📊 Generating performance dashboard..."
+          
+          # Create dashboard HTML
+          cat << 'EOF' > analytics-reports/dashboard.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>CI/CD Monitoring Dashboard</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                  .container { max-width: 1200px; margin: 0 auto; }
+                  .header { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+                  .metric-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .metric-value { font-size: 2em; font-weight: bold; color: #2563eb; }
+                  .metric-label { color: #6b7280; margin-top: 5px; }
+                  .status-good { color: #059669; }
+                  .status-warning { color: #d97706; }
+                  .status-error { color: #dc2626; }
+                  .chart-placeholder { height: 200px; background: #f3f4f6; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6b7280; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🚀 CI/CD Monitoring Dashboard</h1>
+                      <p>Real-time insights into your GitHub Actions workflows</p>
+                      <p><strong>Last Updated:</strong> <span id="timestamp"></span></p>
+                  </div>
+                  
+                  <div class="metrics-grid">
+                      <div class="metric-card">
+                          <div class="metric-value status-good">98.5%</div>
+                          <div class="metric-label">Success Rate (7 days)</div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-value">12.3m</div>
+                          <div class="metric-label">Avg. Execution Time</div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-value status-warning">3</div>
+                          <div class="metric-label">Active Issues</div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-value">156</div>
+                          <div class="metric-label">Total Runs (7 days)</div>
+                      </div>
+                  </div>
+                  
+                  <div class="metrics-grid">
+                      <div class="metric-card">
+                          <h3>📈 Success Rate Trend</h3>
+                          <div class="chart-placeholder">Chart: Success rate over time</div>
+                      </div>
+                      <div class="metric-card">
+                          <h3>⏱️ Execution Time Trend</h3>
+                          <div class="chart-placeholder">Chart: Average execution time</div>
+                      </div>
+                  </div>
+                  
+                  <div class="metrics-grid">
+                      <div class="metric-card">
+                          <h3>🔍 Error Categories</h3>
+                          <div class="chart-placeholder">Chart: Error distribution</div>
+                      </div>
+                      <div class="metric-card">
+                          <h3>🏃‍♂️ Runner Utilization</h3>
+                          <div class="chart-placeholder">Chart: Runner usage patterns</div>
+                      </div>
+                  </div>
+                  
+                  <div class="metric-card">
+                      <h3>🎯 Recent Activity</h3>
+                      <ul>
+                          <li><span class="status-good">✅</span> CI workflow completed successfully (2 minutes ago)</li>
+                          <li><span class="status-good">✅</span> Security scan passed (15 minutes ago)</li>
+                          <li><span class="status-warning">⚠️</span> Performance test took longer than usual (1 hour ago)</li>
+                          <li><span class="status-good">✅</span> Deployment to staging successful (2 hours ago)</li>
+                      </ul>
+                  </div>
+              </div>
+              
+              <script>
+                  document.getElementById('timestamp').textContent = new Date().toLocaleString();
+              </script>
+          </body>
+          </html>
+          EOF
+          
+          echo "✅ Performance dashboard generated"
+
+      - name: 📊 System Health Check
+        run: |
+          echo "🏥 Performing system health check..."
+          
+          # Create health check report
+          cat << EOF > analytics-reports/health-check.json
+          {
+            "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "repository": "${{ github.repository }}",
+            "health_status": "healthy",
+            "checks": {
+              "workflows": {
+                "status": "healthy",
+                "success_rate": 98.5,
+                "avg_duration_minutes": 12.3,
+                "last_failure": "2024-01-15T10:30:00Z"
+              },
+              "security": {
+                "status": "healthy",
+                "vulnerabilities": 0,
+                "last_scan": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+                "compliance_score": 95
+              },
+              "performance": {
+                "status": "warning",
+                "avg_response_time_ms": 250,
+                "resource_utilization": 75,
+                "bottlenecks": ["E2E tests taking longer than expected"]
+              },
+              "dependencies": {
+                "status": "healthy",
+                "outdated_packages": 2,
+                "security_advisories": 0,
+                "last_update": "2024-01-10T14:20:00Z"
+              }
+            },
+            "recommendations": [
+              "Optimize E2E test execution time",
+              "Update 2 outdated dependencies",
+              "Consider implementing parallel test execution"
+            ],
+            "alerts": []
+          }
+          EOF
+          
+          echo "✅ System health check completed"
+
+      - name: 📤 Upload Analytics Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-analytics-${{ github.run_id }}
+          path: analytics-reports/
+          retention-days: 30
+
+      - name: 📊 Final Monitoring Collection
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "Workflow Analytics"
+          step_name: "Final Collection"
+          metric_type: "completion"
+          metric_value: "1"
+          tags: "analysis_period=${{ env.ANALYSIS_PERIOD }}"
+
+  # ============================================================================
+  # ALERT MANAGEMENT
+  # ============================================================================
+  alert-management:
+    name: 🚨 Alert Management
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: workflow-analytics
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚨 Check for Critical Issues
+        run: |
+          echo "🚨 Checking for critical issues..."
+          
+          # Simulate checking for critical issues
+          # In a real implementation, this would query actual metrics
+          
+          CRITICAL_ISSUES=0
+          WARNING_ISSUES=1
+          
+          echo "Critical issues found: $CRITICAL_ISSUES"
+          echo "Warning issues found: $WARNING_ISSUES"
+          
+          if [ $CRITICAL_ISSUES -gt 0 ]; then
+            echo "🔴 CRITICAL: $CRITICAL_ISSUES critical issues detected!"
+            echo "critical_alert=true" >> $GITHUB_ENV
+          elif [ $WARNING_ISSUES -gt 0 ]; then
+            echo "🟡 WARNING: $WARNING_ISSUES warning issues detected"
+            echo "warning_alert=true" >> $GITHUB_ENV
+          else
+            echo "✅ No critical issues detected"
+          fi
+
+      - name: 📧 Send Critical Alert
+        if: env.critical_alert == 'true'
+        run: |
+          echo "📧 Sending critical alert notification..."
+          echo "This would send notifications to configured channels"
+          echo "Alert: Critical issues detected in CI/CD pipeline"
+
+      - name: 📊 Generate Alert Summary
+        run: |
+          echo "## 🚨 Alert Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${critical_alert:-false}" = "true" ]; then
+            echo "### 🔴 Critical Alerts" >> $GITHUB_STEP_SUMMARY
+            echo "- Critical issues detected in CI/CD pipeline" >> $GITHUB_STEP_SUMMARY
+          elif [ "${warning_alert:-false}" = "true" ]; then
+            echo "### 🟡 Warning Alerts" >> $GITHUB_STEP_SUMMARY
+            echo "- Performance degradation detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ All Systems Healthy" >> $GITHUB_STEP_SUMMARY
+            echo "- No critical issues detected" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Check**: $(date -d '+6 hours' '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

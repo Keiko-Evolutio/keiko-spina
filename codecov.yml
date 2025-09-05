@@ -1,0 +1,95 @@
+# ============================================================================
+# CODECOV CONFIGURATION FOR KEI-MCP API
+# ============================================================================
+
+codecov:
+  require_ci_to_pass: true
+  notify:
+    after_n_builds: 1
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  
+  status:
+    project:
+      default:
+        target: 85%
+        threshold: 1%
+        base: auto
+        if_ci_failed: error
+        only_pulls: false
+    
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        base: auto
+        if_ci_failed: error
+        only_pulls: true
+
+  ignore:
+    - "backend/tests/**"
+    - "tests/**"
+    - "**/*_test.py"
+    - "**/test_*.py"
+    - "backend/migrations/**"
+    - "backend/alembic/**"
+    - "backend/scripts/**"
+    - "backend/docs/**"
+    - "docs/**"
+    - "*.md"
+    - "*.yml"
+    - "*.yaml"
+    - "*.toml"
+    - "*.cfg"
+    - "*.ini"
+    - "Dockerfile*"
+    - "docker-compose*"
+    - ".github/**"
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false
+
+comment:
+  layout: "reach,diff,flags,tree,reach"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  branches:
+    - main
+    - develop
+
+github_checks:
+  annotations: true
+
+flags:
+  unittests:
+    paths:
+      - backend/
+    carryforward: false
+    
+  integration:
+    paths:
+      - backend/
+    carryforward: false
+
+component_management:
+  default_rules:
+    flag_regexes:
+      - name: backend
+        paths:
+          - backend/
+        statuses:
+          - type: project
+            target: 85%
+          - type: patch
+            target: 80%

@@ -1,0 +1,366 @@
+syntax = "proto3";
+
+package keiko.sdk.communication.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/keiko-dev-team/kei-agent-py-sdk/api/communication/v1";
+option java_package = "dev.keiko.sdk.communication.v1";
+option java_multiple_files = true;
+option csharp_namespace = "Keiko.SDK.Communication.V1";
+
+// ============================================================================
+// SDK-PLATFORM COMMUNICATION DEFINITIONS
+// Diese .proto Datei definiert gRPC-Kommunikation zwischen SDK und Platform.
+// WICHTIG: Vollständig unabhängig von Platform-internen Definitionen.
+// ============================================================================
+
+// SDK-Platform Communication Service
+service SDKPlatformCommunicationService {
+  // Agent Management
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  rpc DeregisterAgent(DeregisterAgentRequest) returns (DeregisterAgentResponse);
+  rpc GetAgentStatus(GetAgentStatusRequest) returns (GetAgentStatusResponse);
+  
+  // Function Management
+  rpc RegisterFunction(RegisterFunctionRequest) returns (RegisterFunctionResponse);
+  rpc CallFunction(CallFunctionRequest) returns (CallFunctionResponse);
+  rpc StreamFunctionCalls(stream FunctionCallMessage) returns (stream FunctionCallResponse);
+  
+  // Event Communication
+  rpc PublishEvent(PublishEventRequest) returns (PublishEventResponse);
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream EventMessage);
+  
+  // Configuration Management
+  rpc GetConfiguration(GetConfigurationRequest) returns (GetConfigurationResponse);
+  rpc UpdateConfiguration(UpdateConfigurationRequest) returns (UpdateConfigurationResponse);
+  
+  // Health and Monitoring
+  rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetPlatformHealth(GetPlatformHealthRequest) returns (GetPlatformHealthResponse);
+}
+
+// ============================================================================
+// AGENT MANAGEMENT MESSAGES
+// ============================================================================
+
+message RegisterAgentRequest {
+  string agent_id = 1;
+  SDKAgentType agent_type = 2;
+  repeated string capabilities = 3;
+  google.protobuf.Struct metadata = 4;
+  SDKAgentConfiguration configuration = 5;
+  string sdk_version = 6;
+}
+
+message RegisterAgentResponse {
+  string agent_id = 1;
+  bool registered = 2;
+  google.protobuf.Timestamp registered_at = 3;
+  string platform_agent_id = 4; // Platform-interne ID (falls unterschiedlich)
+  SDKAgentConfiguration assigned_configuration = 5;
+}
+
+message UpdateAgentRequest {
+  string agent_id = 1;
+  SDKAgentStatus status = 2;
+  repeated string capabilities = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+message UpdateAgentResponse {
+  string agent_id = 1;
+  bool updated = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+message DeregisterAgentRequest {
+  string agent_id = 1;
+  string reason = 2;
+}
+
+message DeregisterAgentResponse {
+  string agent_id = 1;
+  bool deregistered = 2;
+  google.protobuf.Timestamp deregistered_at = 3;
+}
+
+message GetAgentStatusRequest {
+  string agent_id = 1;
+}
+
+message GetAgentStatusResponse {
+  string agent_id = 1;
+  SDKAgentStatus status = 2;
+  google.protobuf.Timestamp last_seen = 3;
+  google.protobuf.Struct status_details = 4;
+}
+
+enum SDKAgentType {
+  SDK_AGENT_TYPE_UNSPECIFIED = 0;
+  SDK_AGENT_TYPE_CODE_ASSISTANT = 1;
+  SDK_AGENT_TYPE_DATA_ANALYST = 2;
+  SDK_AGENT_TYPE_WORKFLOW_MANAGER = 3;
+  SDK_AGENT_TYPE_MONITORING_AGENT = 4;
+  SDK_AGENT_TYPE_CUSTOM = 5;
+}
+
+enum SDKAgentStatus {
+  SDK_AGENT_STATUS_UNSPECIFIED = 0;
+  SDK_AGENT_STATUS_ACTIVE = 1;
+  SDK_AGENT_STATUS_INACTIVE = 2;
+  SDK_AGENT_STATUS_ERROR = 3;
+  SDK_AGENT_STATUS_MAINTENANCE = 4;
+}
+
+message SDKAgentConfiguration {
+  google.protobuf.Struct config_data = 1;
+  int32 heartbeat_interval_seconds = 2;
+  int32 function_timeout_seconds = 3;
+  repeated string allowed_operations = 4;
+  google.protobuf.Struct resource_limits = 5;
+}
+
+// ============================================================================
+// FUNCTION MANAGEMENT MESSAGES
+// ============================================================================
+
+message RegisterFunctionRequest {
+  string agent_id = 1;
+  string function_name = 2;
+  string description = 3;
+  google.protobuf.Struct parameters_schema = 4;
+  google.protobuf.Struct return_schema = 5;
+  int32 timeout_seconds = 6;
+  repeated string required_capabilities = 7;
+}
+
+message RegisterFunctionResponse {
+  string function_id = 1;
+  string agent_id = 2;
+  string function_name = 3;
+  bool registered = 4;
+  google.protobuf.Timestamp registered_at = 5;
+}
+
+message CallFunctionRequest {
+  string function_id = 1;
+  string agent_id = 2;
+  string function_name = 3;
+  google.protobuf.Struct parameters = 4;
+  int32 timeout_seconds = 5;
+  string correlation_id = 6;
+}
+
+message CallFunctionResponse {
+  string call_id = 1;
+  string function_id = 2;
+  SDKFunctionCallStatus status = 3;
+  google.protobuf.Any result = 4;
+  string error_message = 5;
+  string error_code = 6;
+  int64 execution_time_ms = 7;
+  google.protobuf.Timestamp completed_at = 8;
+}
+
+message FunctionCallMessage {
+  string call_id = 1;
+  oneof message_type {
+    CallFunctionRequest call_request = 2;
+    FunctionCallProgress progress = 3;
+    FunctionCallCancel cancel = 4;
+  }
+}
+
+message FunctionCallProgress {
+  string call_id = 1;
+  int32 progress_percent = 2;
+  string status_message = 3;
+  google.protobuf.Struct progress_data = 4;
+}
+
+message FunctionCallCancel {
+  string call_id = 1;
+  string reason = 2;
+}
+
+enum SDKFunctionCallStatus {
+  SDK_FUNCTION_CALL_STATUS_UNSPECIFIED = 0;
+  SDK_FUNCTION_CALL_STATUS_PENDING = 1;
+  SDK_FUNCTION_CALL_STATUS_RUNNING = 2;
+  SDK_FUNCTION_CALL_STATUS_SUCCESS = 3;
+  SDK_FUNCTION_CALL_STATUS_ERROR = 4;
+  SDK_FUNCTION_CALL_STATUS_TIMEOUT = 5;
+  SDK_FUNCTION_CALL_STATUS_CANCELLED = 6;
+}
+
+// ============================================================================
+// EVENT COMMUNICATION MESSAGES
+// ============================================================================
+
+message PublishEventRequest {
+  string agent_id = 1;
+  SDKEventMessage event = 2;
+  bool wait_for_confirmation = 3;
+}
+
+message PublishEventResponse {
+  string event_id = 1;
+  bool published = 2;
+  google.protobuf.Timestamp published_at = 3;
+}
+
+message SubscribeEventsRequest {
+  string agent_id = 1;
+  repeated string event_types = 2;
+  repeated string source_agents = 3;
+  bool include_platform_events = 4;
+}
+
+message EventMessage {
+  string event_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string source_agent_id = 4;
+  google.protobuf.Any payload = 5;
+  google.protobuf.Struct metadata = 6;
+}
+
+message SDKEventMessage {
+  string event_type = 1;
+  google.protobuf.Any payload = 2;
+  google.protobuf.Struct metadata = 3;
+  string correlation_id = 4;
+}
+
+// ============================================================================
+// CONFIGURATION MANAGEMENT MESSAGES
+// ============================================================================
+
+message GetConfigurationRequest {
+  string agent_id = 1;
+  repeated string config_keys = 2;
+}
+
+message GetConfigurationResponse {
+  string agent_id = 1;
+  google.protobuf.Struct configuration = 2;
+  google.protobuf.Timestamp last_updated = 3;
+  string config_version = 4;
+}
+
+message UpdateConfigurationRequest {
+  string agent_id = 1;
+  google.protobuf.Struct configuration_updates = 2;
+  bool merge_with_existing = 3;
+}
+
+message UpdateConfigurationResponse {
+  string agent_id = 1;
+  bool updated = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string new_config_version = 4;
+}
+
+// ============================================================================
+// HEALTH AND MONITORING MESSAGES
+// ============================================================================
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  SDKAgentStatus status = 2;
+  google.protobuf.Struct metrics = 3;
+  repeated string warnings = 4;
+  repeated string errors = 5;
+}
+
+message HeartbeatResponse {
+  string agent_id = 1;
+  bool acknowledged = 2;
+  google.protobuf.Timestamp server_time = 3;
+  SDKPlatformInstruction instruction = 4;
+}
+
+message GetPlatformHealthRequest {
+  string agent_id = 1;
+}
+
+message GetPlatformHealthResponse {
+  SDKPlatformHealthStatus status = 1;
+  google.protobuf.Struct health_details = 2;
+  repeated string available_services = 3;
+  repeated string unavailable_services = 4;
+  google.protobuf.Timestamp last_check = 5;
+}
+
+message SDKPlatformInstruction {
+  SDKInstructionType instruction_type = 1;
+  google.protobuf.Struct instruction_data = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+enum SDKInstructionType {
+  SDK_INSTRUCTION_TYPE_UNSPECIFIED = 0;
+  SDK_INSTRUCTION_TYPE_NO_ACTION = 1;
+  SDK_INSTRUCTION_TYPE_UPDATE_CONFIG = 2;
+  SDK_INSTRUCTION_TYPE_RESTART = 3;
+  SDK_INSTRUCTION_TYPE_SHUTDOWN = 4;
+  SDK_INSTRUCTION_TYPE_MAINTENANCE_MODE = 5;
+}
+
+enum SDKPlatformHealthStatus {
+  SDK_PLATFORM_HEALTH_STATUS_UNSPECIFIED = 0;
+  SDK_PLATFORM_HEALTH_STATUS_HEALTHY = 1;
+  SDK_PLATFORM_HEALTH_STATUS_DEGRADED = 2;
+  SDK_PLATFORM_HEALTH_STATUS_UNHEALTHY = 3;
+  SDK_PLATFORM_HEALTH_STATUS_MAINTENANCE = 4;
+}
+
+// ============================================================================
+// COMMON DATA TYPES
+// ============================================================================
+
+message SDKError {
+  string error_code = 1;
+  string error_message = 2;
+  google.protobuf.Struct error_details = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+}
+
+message SDKMetrics {
+  int64 uptime_seconds = 1;
+  double cpu_usage_percent = 2;
+  int64 memory_usage_bytes = 3;
+  int32 active_functions = 4;
+  int32 completed_functions = 5;
+  int32 failed_functions = 6;
+  google.protobuf.Struct custom_metrics = 7;
+}
+
+message SDKCapability {
+  string name = 1;
+  string version = 2;
+  google.protobuf.Struct parameters = 3;
+  repeated string dependencies = 4;
+}
+
+// ============================================================================
+// API VERSIONING AND COMPATIBILITY
+// ============================================================================
+
+message SDKAPIVersion {
+  int32 major = 1;
+  int32 minor = 2;
+  int32 patch = 3;
+  string pre_release = 4;
+}
+
+message SDKCompatibilityInfo {
+  SDKAPIVersion min_supported_version = 1;
+  SDKAPIVersion max_supported_version = 2;
+  repeated string deprecated_features = 3;
+  repeated string breaking_changes = 4;
+}

@@ -1,0 +1,608 @@
+asyncapi: 3.0.0
+info:
+  title: Keiko Platform-SDK Real-time Events
+  version: 1.0.0
+  description: |
+    **Architektur-konforme AsyncAPI für Real-time Event-Kommunikation**
+    
+    Diese AsyncAPI definiert asynchrone Kommunikation zwischen Platform und SDK durch:
+    - WebSocket-basierte Real-time Updates
+    - Server-Sent Events für Event-Streaming  
+    - Versionierte Event-Schemas
+    - Keine direkten NATS-Dependencies
+    
+    **Compliance:** Ersetzt direkte NATS-Subscriptions durch WebSocket/SSE APIs.
+  contact:
+    name: Keiko Architecture Team
+    email: architecture@keiko.dev
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  websocket_production:
+    host: platform-ws.keiko.dev
+    protocol: wss
+    description: Production WebSocket Server
+    security:
+      - apiKey: []
+  websocket_staging:
+    host: staging-platform-ws.keiko.dev
+    protocol: wss
+    description: Staging WebSocket Server
+    security:
+      - apiKey: []
+  websocket_local:
+    host: localhost:8001
+    protocol: ws
+    description: Local Development WebSocket
+  sse_production:
+    host: platform-api.keiko.dev
+    protocol: https
+    pathname: /v1/events/stream
+    description: Production Server-Sent Events
+    security:
+      - bearerAuth: []
+
+defaultContentType: application/json
+
+channels:
+  agent_events:
+    address: /agents/{agent_id}/events
+    title: Agent Events Channel
+    description: |
+      Real-time Agent-Events über WebSocket.
+      SDK kann Agent-Events abonnieren ohne direkte NATS-Verbindung.
+    parameters:
+      agent_id:
+        description: Agent ID für Event-Filtering
+        schema:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+    messages:
+      agent_created:
+        $ref: '#/components/messages/AgentCreatedEvent'
+      agent_updated:
+        $ref: '#/components/messages/AgentUpdatedEvent'
+      agent_status_changed:
+        $ref: '#/components/messages/AgentStatusChangedEvent'
+      agent_deleted:
+        $ref: '#/components/messages/AgentDeletedEvent'
+
+  task_events:
+    address: /tasks/{task_id}/events
+    title: Task Events Channel
+    description: Real-time Task-Events über WebSocket
+    parameters:
+      task_id:
+        description: Task ID für Event-Filtering
+        schema:
+          type: string
+          pattern: '^task_[a-zA-Z0-9_]+$'
+    messages:
+      task_created:
+        $ref: '#/components/messages/TaskCreatedEvent'
+      task_assigned:
+        $ref: '#/components/messages/TaskAssignedEvent'
+      task_completed:
+        $ref: '#/components/messages/TaskCompletedEvent'
+      task_failed:
+        $ref: '#/components/messages/TaskFailedEvent'
+
+  workflow_events:
+    address: /workflows/{workflow_id}/events
+    title: Workflow Events Channel
+    description: Real-time Workflow-Events über WebSocket
+    parameters:
+      workflow_id:
+        description: Workflow ID für Event-Filtering
+        schema:
+          type: string
+          pattern: '^workflow_[a-zA-Z0-9_]+$'
+    messages:
+      workflow_started:
+        $ref: '#/components/messages/WorkflowStartedEvent'
+      workflow_completed:
+        $ref: '#/components/messages/WorkflowCompletedEvent'
+      workflow_failed:
+        $ref: '#/components/messages/WorkflowFailedEvent'
+
+  system_events:
+    address: /system/events
+    title: System Events Channel
+    description: Platform-weite System-Events
+    messages:
+      platform_health:
+        $ref: '#/components/messages/PlatformHealthEvent'
+      maintenance_mode:
+        $ref: '#/components/messages/MaintenanceModeEvent'
+
+  # Server-Sent Events Channels
+  sse_agent_stream:
+    address: /v1/events/agent/{agent_id}/stream
+    title: Agent Events SSE Stream
+    description: |
+      Server-Sent Events Stream für Agent-Updates.
+      Alternative zu WebSocket für einfachere Integration.
+    parameters:
+      agent_id:
+        description: Agent ID für Event-Filtering
+        schema:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+    messages:
+      sse_agent_event:
+        $ref: '#/components/messages/SSEAgentEvent'
+
+operations:
+  subscribe_agent_events:
+    action: receive
+    channel:
+      $ref: '#/channels/agent_events'
+    title: Subscribe to Agent Events
+    description: |
+      SDK abonniert Agent-Events über WebSocket.
+      Ersetzt direkte NATS-Subscription durch WebSocket-basierte Kommunikation.
+    messages:
+      - $ref: '#/channels/agent_events/messages/agent_created'
+      - $ref: '#/channels/agent_events/messages/agent_updated'
+      - $ref: '#/channels/agent_events/messages/agent_status_changed'
+      - $ref: '#/channels/agent_events/messages/agent_deleted'
+
+  publish_agent_command:
+    action: send
+    channel:
+      $ref: '#/channels/agent_events'
+    title: Send Agent Command
+    description: SDK sendet Agent-Commands über WebSocket
+    messages:
+      - $ref: '#/components/messages/AgentCommandMessage'
+
+  subscribe_task_events:
+    action: receive
+    channel:
+      $ref: '#/channels/task_events'
+    title: Subscribe to Task Events
+    description: SDK abonniert Task-Events über WebSocket
+
+  subscribe_workflow_events:
+    action: receive
+    channel:
+      $ref: '#/channels/workflow_events'
+    title: Subscribe to Workflow Events
+    description: SDK abonniert Workflow-Events über WebSocket
+
+  subscribe_system_events:
+    action: receive
+    channel:
+      $ref: '#/channels/system_events'
+    title: Subscribe to System Events
+    description: SDK abonniert System-Events über WebSocket
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: query
+      name: api_key
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  messages:
+    AgentCreatedEvent:
+      name: agent.created
+      title: Agent Created Event
+      description: Event wird ausgelöst wenn neuer Agent erstellt wird
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentCreatedPayload'
+      examples:
+        - name: Code Assistant Created
+          payload:
+            event_id: "evt_123abc"
+            event_type: "agent.created"
+            timestamp: "2025-08-31T10:00:00Z"
+            agent_id: "agent_code_assistant_001"
+            agent_type: "code_assistant"
+            capabilities: ["code_generation", "debugging", "testing"]
+            metadata:
+              created_by: "user_456"
+              environment: "production"
+
+    AgentUpdatedEvent:
+      name: agent.updated
+      title: Agent Updated Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentUpdatedPayload'
+
+    AgentStatusChangedEvent:
+      name: agent.status_changed
+      title: Agent Status Changed Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentStatusChangedPayload'
+
+    AgentDeletedEvent:
+      name: agent.deleted
+      title: Agent Deleted Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentDeletedPayload'
+
+    TaskCreatedEvent:
+      name: task.created
+      title: Task Created Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TaskCreatedPayload'
+
+    TaskAssignedEvent:
+      name: task.assigned
+      title: Task Assigned Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TaskAssignedPayload'
+
+    TaskCompletedEvent:
+      name: task.completed
+      title: Task Completed Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TaskCompletedPayload'
+
+    TaskFailedEvent:
+      name: task.failed
+      title: Task Failed Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TaskFailedPayload'
+
+    WorkflowStartedEvent:
+      name: workflow.started
+      title: Workflow Started Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/WorkflowStartedPayload'
+
+    WorkflowCompletedEvent:
+      name: workflow.completed
+      title: Workflow Completed Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/WorkflowCompletedPayload'
+
+    WorkflowFailedEvent:
+      name: workflow.failed
+      title: Workflow Failed Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/WorkflowFailedPayload'
+
+    PlatformHealthEvent:
+      name: platform.health
+      title: Platform Health Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PlatformHealthPayload'
+
+    MaintenanceModeEvent:
+      name: platform.maintenance
+      title: Maintenance Mode Event
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MaintenanceModePayload'
+
+    AgentCommandMessage:
+      name: agent.command
+      title: Agent Command Message
+      description: SDK sendet Commands an Agent über WebSocket
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AgentCommandPayload'
+
+    SSEAgentEvent:
+      name: sse.agent.event
+      title: Server-Sent Event für Agent Updates
+      contentType: text/event-stream
+      payload:
+        $ref: '#/components/schemas/SSEEventPayload'
+
+  schemas:
+    BaseEventPayload:
+      type: object
+      required:
+        - event_id
+        - event_type
+        - timestamp
+      properties:
+        event_id:
+          type: string
+          description: Eindeutige Event-ID
+          example: "evt_123abc456"
+        event_type:
+          type: string
+          description: Event-Typ
+        timestamp:
+          type: string
+          format: date-time
+          description: Event-Zeitstempel
+        api_version:
+          type: string
+          description: API-Version
+          default: "v1"
+
+    AgentCreatedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - agent_id
+            - agent_type
+          properties:
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            agent_type:
+              type: string
+              enum: ["code_assistant", "data_analyst", "workflow_manager", "monitoring_agent"]
+            capabilities:
+              type: array
+              items:
+                type: string
+            metadata:
+              type: object
+              additionalProperties:
+                type: string
+
+    AgentUpdatedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - agent_id
+          properties:
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            capabilities:
+              type: array
+              items:
+                type: string
+            metadata:
+              type: object
+              additionalProperties:
+                type: string
+
+    AgentStatusChangedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - agent_id
+            - status
+          properties:
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            status:
+              type: string
+              enum: ["active", "inactive", "error", "maintenance"]
+            previous_status:
+              type: string
+              enum: ["active", "inactive", "error", "maintenance"]
+
+    AgentDeletedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - agent_id
+          properties:
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            reason:
+              type: string
+
+    TaskCreatedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - task_id
+            - task_type
+          properties:
+            task_id:
+              type: string
+              pattern: '^task_[a-zA-Z0-9_]+$'
+            task_type:
+              type: string
+            priority:
+              type: string
+              enum: ["low", "medium", "high", "critical"]
+            metadata:
+              type: object
+
+    TaskAssignedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - task_id
+            - agent_id
+          properties:
+            task_id:
+              type: string
+              pattern: '^task_[a-zA-Z0-9_]+$'
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            assigned_at:
+              type: string
+              format: date-time
+
+    TaskCompletedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - task_id
+            - agent_id
+          properties:
+            task_id:
+              type: string
+              pattern: '^task_[a-zA-Z0-9_]+$'
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            result:
+              type: object
+            duration_ms:
+              type: integer
+
+    TaskFailedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - task_id
+            - agent_id
+            - error
+          properties:
+            task_id:
+              type: string
+              pattern: '^task_[a-zA-Z0-9_]+$'
+            agent_id:
+              type: string
+              pattern: '^agent_[a-zA-Z0-9_]+$'
+            error:
+              type: string
+            retry_count:
+              type: integer
+
+    WorkflowStartedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - workflow_id
+            - plan_id
+          properties:
+            workflow_id:
+              type: string
+              pattern: '^workflow_[a-zA-Z0-9_]+$'
+            plan_id:
+              type: string
+
+    WorkflowCompletedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - workflow_id
+            - status
+          properties:
+            workflow_id:
+              type: string
+              pattern: '^workflow_[a-zA-Z0-9_]+$'
+            status:
+              type: string
+              enum: ["completed", "cancelled"]
+            duration_ms:
+              type: integer
+            result:
+              type: object
+
+    WorkflowFailedPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - workflow_id
+            - error
+          properties:
+            workflow_id:
+              type: string
+              pattern: '^workflow_[a-zA-Z0-9_]+$'
+            error:
+              type: string
+            failed_step:
+              type: string
+
+    PlatformHealthPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum: ["healthy", "degraded", "unhealthy"]
+            components:
+              type: object
+              additionalProperties:
+                type: string
+            metrics:
+              type: object
+
+    MaintenanceModePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseEventPayload'
+        - type: object
+          required:
+            - maintenance_active
+          properties:
+            maintenance_active:
+              type: boolean
+            scheduled_start:
+              type: string
+              format: date-time
+            scheduled_end:
+              type: string
+              format: date-time
+            reason:
+              type: string
+
+    AgentCommandPayload:
+      type: object
+      required:
+        - command_id
+        - command_type
+        - agent_id
+      properties:
+        command_id:
+          type: string
+        command_type:
+          type: string
+          enum: ["start", "stop", "restart", "configure", "execute"]
+        agent_id:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+        parameters:
+          type: object
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+
+    SSEEventPayload:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: string
+          description: JSON-encoded event data
+        event:
+          type: string
+          description: Event type for SSE
+        id:
+          type: string
+          description: Event ID for SSE
+        retry:
+          type: integer
+          description: Retry interval in milliseconds

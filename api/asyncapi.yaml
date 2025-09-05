@@ -1,0 +1,108 @@
+asyncapi: "3.0.0"
+info:
+  title: KEI-Bus AsyncAPI
+  version: "1.0.0"
+  description: "KEI-Bus Contracts für Pub/Sub und Request/Reply"
+tags:
+  - name: bus
+    description: KEI-Bus Kernnachrichten
+  - name: rpc
+    description: Request/Reply über Bus
+  - name: security
+    description: Sicherheitsaspekte (mTLS/JWT)
+defaultContentType: application/json
+servers:
+  dev-nats:
+    host: localhost:4222
+    protocol: nats
+    description: Lokaler NATS Server
+  dev-kafka:
+    host: localhost:9092
+    protocol: kafka
+    description: Lokaler Kafka Broker
+channels:
+  kei.agents.*:
+    address: kei.agents.*
+    messages:
+      AgentEvent:
+        $ref: "#/components/messages/BusMessage"
+  kei.events.*:
+    address: kei.events.*
+    messages:
+      DomainEvent:
+        $ref: "#/components/messages/BusMessage"
+  kei.rpc.*:
+    address: kei.rpc.*
+    messages:
+      RpcMessage:
+        $ref: "#/components/messages/BusMessage"
+components:
+  securitySchemes:
+    mtls:
+      type: clientCertificate
+      description: mTLS Client-Zertifikate
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OAuth2/OIDC JWT Bearer Token
+  messages:
+    BusMessage:
+      name: BusMessage
+      title: KEI-Bus Envelope
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          id:
+            type: string
+          type:
+            type: string
+          subject:
+            type: string
+          ts:
+            type: string
+            format: date-time
+          corr_id:
+            type: string
+            nullable: true
+          causation_id:
+            type: string
+            nullable: true
+          tenant:
+            type: string
+            nullable: true
+          key:
+            type: string
+            nullable: true
+          headers:
+            type: object
+            additionalProperties: true
+          traceparent:
+            type: string
+            nullable: true
+          schema_ref:
+            type: string
+            nullable: true
+          payload:
+            type: object
+            additionalProperties: true
+  providerMappings:
+    nats:
+      channels:
+        pattern: "kei.*"
+        options:
+          orderingKeyHeader: x-ordering-key
+          dedupHeader: Nats-Msg-Id
+          dlqPrefix: kei.dlq.
+          retryHeaders:
+            attempt: x-retry-attempt
+            backoffMs: x-retry-backoff-ms
+    kafka:
+      channels:
+        pattern: "kei.*"
+        options:
+          keyField: key
+          partitions: 12
+          acks: all
+          idempotentProducer: true

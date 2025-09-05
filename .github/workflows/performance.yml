@@ -1,0 +1,573 @@
+name: ⚡ Performance Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+    branches-ignore: [dev]  # Keine Performance-Tests beim Merge nach dev
+  pull_request:
+    branches: [ main, develop ]
+    branches-ignore: [dev]  # Keine Performance-Tests bei PRs nach dev
+  schedule:
+    # Run performance tests weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test to run'
+        required: true
+        default: 'benchmark'
+        type: choice
+        options:
+          - benchmark
+          - load
+          - stress
+          - all
+      duration:
+        description: 'Test duration in minutes (for load/stress tests)'
+        required: false
+        default: '5'
+        type: string
+      users:
+        description: 'Number of concurrent users (for load/stress tests)'
+        required: false
+        default: '100'
+        type: string
+
+# Minimal permissions für Performance Testing
+permissions:
+  contents: read          # Read repository contents
+  actions: read          # Read workflow artifacts
+
+env:
+  PYTHON_VERSION: "3.12"
+  PERFORMANCE_THRESHOLD: 10  # % regression threshold
+
+jobs:
+  # ============================================================================
+  # PARALLEL PERFORMANCE TESTING
+  # ============================================================================
+  performance-tests:
+    name: ⚡ Performance Tests (${{ matrix.test-type }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event.inputs.test_type == matrix.test-type || github.event.inputs.test_type == 'all' || github.event_name != 'workflow_dispatch'
+
+    strategy:
+      matrix:
+        test-type: [benchmark, load, stress]
+        include:
+          - test-type: benchmark
+            test-name: "🔬 Micro-Benchmarks"
+            timeout: 20
+            parallel: true
+          - test-type: load
+            test-name: "📈 Load Testing"
+            timeout: 30
+            parallel: false
+          - test-type: stress
+            test-name: "💪 Stress Testing"
+            timeout: 45
+            parallel: false
+      fail-fast: false
+      max-parallel: 2  # Limit parallel execution for resource-intensive tests
+
+    steps:
+      - name: 🐍 Setup Backend Environment
+        uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          install-dev-deps: true
+          install-test-deps: true
+          working-directory: backend
+          extra-packages: "pytest-benchmark locust"
+
+      - name: 🔬 Run Micro-Benchmarks
+        if: matrix.test-type == 'benchmark'
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            pytest tests/performance/test_api_benchmarks.py \
+              -v \
+              --benchmark-only \
+              --benchmark-json=benchmark-results.json \
+              --benchmark-sort=mean \
+              --benchmark-columns=min,max,mean,stddev,median,iqr,outliers,ops,rounds \
+              -m "performance and not slow"
+          max_attempts: 2
+          retry_wait_seconds: 60
+          timeout_minutes: ${{ matrix.timeout }}
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📈 Run Load Tests
+        if: matrix.test-type == 'load'
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            # Start the application in background
+            python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+            sleep 10
+
+            # Run load tests
+            USERS=${{ github.event.inputs.users || '100' }}
+            DURATION=${{ github.event.inputs.duration || '5' }}
+
+            locust \
+              --host=http://localhost:8000 \
+              --users=$USERS \
+              --spawn-rate=10 \
+              --run-time=${DURATION}m \
+              --headless \
+              --html=load-test-report.html \
+              --csv=load-test-results
+          max_attempts: 2
+          retry_wait_seconds: 120
+          timeout_minutes: ${{ matrix.timeout }}
+          retry_on: any
+          failure_analysis: true
+
+      - name: 💪 Run Stress Tests
+        if: matrix.test-type == 'stress'
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            # Start the application in background
+            python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+            sleep 10
+
+            # Run stress tests with increasing load
+            DURATION=${{ github.event.inputs.duration || '5' }}
+
+            locust \
+              --host=http://localhost:8000 \
+              --users=500 \
+              --spawn-rate=50 \
+              --run-time=${DURATION}m \
+              --headless \
+              --html=stress-test-report.html \
+              --csv=stress-test-results
+          max_attempts: 1  # Stress tests are expensive, don't retry
+          retry_wait_seconds: 180
+          timeout_minutes: ${{ matrix.timeout }}
+          retry_on: error
+          failure_analysis: true
+
+      - name: 📊 Upload Performance Results
+        if: always()
+        uses: ./.github/actions/manage-artifacts
+        with:
+          action: upload
+          name: performance-results-${{ matrix.test-type }}
+          path: |
+            backend/benchmark-results.json
+            backend/*-test-report.html
+            backend/*-test-results*
+          retention-days: 30
+
+  # ============================================================================
+  # LEGACY MICRO-BENCHMARKS (will be removed)
+  # ============================================================================
+  micro-benchmarks:
+    name: 🔬 Micro-Benchmarks (Legacy)
+    if: false  # Disabled - now handled by performance-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event.inputs.test_type == 'benchmark' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 🔧 Setup Test Environment
+        run: |
+          cd backend
+          echo "TESTING=true" > .env.test
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env.test
+          echo "DATABASE_URL=sqlite:///test.db" >> .env.test
+
+      - name: 🔬 Run Micro-Benchmarks with Retry
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            pytest tests/performance/test_api_benchmarks.py \
+              -v \
+              --benchmark-only \
+              --benchmark-json=benchmark-results.json \
+              --benchmark-sort=mean \
+              --benchmark-columns=min,max,mean,stddev,median,iqr,outliers,ops,rounds \
+              -m "performance and not slow"
+          max_attempts: 2
+          retry_wait_seconds: 60
+          timeout_minutes: 20
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📊 Process Benchmark Results
+        run: |
+          cd backend
+          python -c "
+          import json
+          import sys
+          
+          with open('benchmark-results.json', 'r') as f:
+              data = json.load(f)
+          
+          print('# 🔬 Micro-Benchmark Results')
+          print()
+          print('| Test | Mean (ms) | P95 (ms) | Ops/sec | Status |')
+          print('|------|-----------|----------|---------|--------|')
+          
+          sla_targets = {
+              'test_tool_invocation_latency': 200,
+              'test_resource_list_latency': 100,
+              'test_server_registration_latency': 300,
+              'test_tool_discovery_latency': 150
+          }
+          
+          for benchmark in data['benchmarks']:
+              name = benchmark['name']
+              mean_ms = benchmark['stats']['mean'] * 1000
+              ops_per_sec = benchmark['stats']['ops']
+              
+              # Estimate P95 (rough approximation)
+              p95_ms = (benchmark['stats']['mean'] + 2 * benchmark['stats']['stddev']) * 1000
+              
+              # Check SLA
+              sla_target = sla_targets.get(name.split('[')[0], 1000)
+              status = '✅ PASS' if mean_ms < sla_target else '❌ FAIL'
+              
+              print(f'| {name[:30]} | {mean_ms:.1f} | {p95_ms:.1f} | {ops_per_sec:.0f} | {status} |')
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Upload Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: micro-benchmark-results
+          path: backend/benchmark-results.json
+          retention-days: 30
+
+      - name: 🔍 Performance Regression Check
+        run: |
+          cd backend
+          # Download previous benchmark results if available
+          if [ -f "../.github/performance-baseline.json" ]; then
+            python -c "
+            import json
+            import sys
+            
+            with open('benchmark-results.json', 'r') as f:
+                current = json.load(f)
+            
+            with open('../.github/performance-baseline.json', 'r') as f:
+                baseline = json.load(f)
+            
+            regressions = []
+            
+            for current_bench in current['benchmarks']:
+                name = current_bench['name']
+                current_mean = current_bench['stats']['mean']
+                
+                # Find corresponding baseline
+                baseline_bench = next((b for b in baseline['benchmarks'] if b['name'] == name), None)
+                if baseline_bench:
+                    baseline_mean = baseline_bench['stats']['mean']
+                    regression = ((current_mean - baseline_mean) / baseline_mean) * 100
+                    
+                    if regression > ${{ env.PERFORMANCE_THRESHOLD }}:
+                        regressions.append(f'{name}: {regression:.1f}% slower')
+            
+            if regressions:
+                print('❌ Performance regressions detected:')
+                for regression in regressions:
+                    print(f'  - {regression}')
+                sys.exit(1)
+            else:
+                print('✅ No significant performance regressions detected')
+            "
+          else
+            echo "ℹ️ No baseline found, skipping regression check"
+          fi
+
+  # ============================================================================
+  # LOAD TESTING
+  # ============================================================================
+  load-testing:
+    name: 📈 Load Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: github.event.inputs.test_type == 'load' || github.event.inputs.test_type == 'all'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+          pip install locust
+
+      - name: 🚀 Start API Server
+        run: |
+          cd backend
+          echo "TESTING=true" > .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
+
+      - name: 📈 Run Load Tests with Retry
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            USERS=${{ github.event.inputs.users || '100' }}
+            DURATION=${{ github.event.inputs.duration || '5' }}
+
+            # Warmup run first
+            locust \
+              --host=http://localhost:8000 \
+              --users=10 \
+              --spawn-rate=2 \
+              --run-time=30s \
+              --headless
+
+            # Wait for system to stabilize
+            sleep 30
+
+            # Actual load test
+            locust \
+              --host=http://localhost:8000 \
+              --users=$USERS \
+              --spawn-rate=10 \
+              --run-time=${DURATION}m \
+              --headless \
+              --html=load-test-report.html \
+              --csv=load-test-results
+          max_attempts: 2
+          retry_wait_seconds: 120
+          timeout_minutes: 30
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📊 Analyze Load Test Results
+        run: |
+          echo "# 📈 Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "load-test-results_stats.csv" ]; then
+            python -c "
+            import csv
+            import sys
+            
+            print('## Summary Statistics')
+            print()
+            print('| Endpoint | Requests | Failures | Avg (ms) | P95 (ms) | P99 (ms) | RPS |')
+            print('|----------|----------|----------|----------|----------|----------|-----|')
+            
+            with open('load-test-results_stats.csv', 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row['Type'] == 'GET' or row['Type'] == 'POST':
+                        name = row['Name'][:30]
+                        requests = row['Request Count']
+                        failures = row['Failure Count']
+                        avg_ms = float(row['Average Response Time']) if row['Average Response Time'] else 0
+                        p95_ms = float(row['95%']) if row['95%'] else 0
+                        p99_ms = float(row['99%']) if row['99%'] else 0
+                        rps = float(row['Requests/s']) if row['Requests/s'] else 0
+                        
+                        print(f'| {name} | {requests} | {failures} | {avg_ms:.0f} | {p95_ms:.0f} | {p99_ms:.0f} | {rps:.1f} |')
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📊 Upload Load Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: |
+            load-test-report.html
+            load-test-results_*.csv
+          retention-days: 30
+
+      - name: 🎯 SLA Validation
+        run: |
+          python -c "
+          import csv
+          import sys
+          
+          sla_violations = []
+          
+          if not os.path.exists('load-test-results_stats.csv'):
+              print('No load test results found')
+              sys.exit(0)
+          
+          with open('load-test-results_stats.csv', 'r') as f:
+              reader = csv.DictReader(f)
+              for row in reader:
+                  name = row['Name']
+                  p95_ms = float(row['95%']) if row['95%'] else 0
+                  
+                  # SLA targets
+                  if 'tool_invocation' in name.lower() and p95_ms > 200:
+                      sla_violations.append(f'Tool Invocation P95: {p95_ms:.0f}ms > 200ms SLA')
+                  elif 'resource' in name.lower() and p95_ms > 100:
+                      sla_violations.append(f'Resource Access P95: {p95_ms:.0f}ms > 100ms SLA')
+                  elif 'discovery' in name.lower() and p95_ms > 150:
+                      sla_violations.append(f'Tool Discovery P95: {p95_ms:.0f}ms > 150ms SLA')
+          
+          if sla_violations:
+              print('❌ SLA violations detected:')
+              for violation in sla_violations:
+                  print(f'  - {violation}')
+              sys.exit(1)
+          else:
+              print('✅ All SLA targets met')
+          "
+
+  # ============================================================================
+  # STRESS TESTING
+  # ============================================================================
+  stress-testing:
+    name: 💥 Stress Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event.inputs.test_type == 'stress' || github.event.inputs.test_type == 'all'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 💥 Run Stress Tests
+        run: |
+          cd backend
+          pytest tests/performance/test_stress_scenarios.py \
+            -v \
+            --tb=short \
+            -m "stress and not slow" \
+            --junit-xml=stress-test-results.xml
+
+      - name: 📊 Upload Stress Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results
+          path: backend/stress-test-results.xml
+          retention-days: 30
+
+  # ============================================================================
+  # PERFORMANCE SUMMARY
+  # ============================================================================
+  performance-summary:
+    name: 📊 Performance Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [micro-benchmarks, load-testing, stress-testing]
+    if: always()
+
+    steps:
+      - name: 📊 Download All Results
+        uses: actions/download-artifact@v4
+        with:
+          path: performance-results/
+
+      - name: 📊 Generate Performance Summary
+        run: |
+          echo "# ⚡ Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Micro-Benchmarks: ${{ needs.micro-benchmarks.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Load Testing: ${{ needs.load-testing.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Stress Testing: ${{ needs.stress-testing.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Performance Artifacts" >> $GITHUB_STEP_SUMMARY
+          if [ -d "performance-results" ]; then
+            find performance-results -name "*.json" -o -name "*.csv" -o -name "*.html" | while read file; do
+              echo "- $(basename "$file")" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ Performance Tests Complete
+        run: |
+          echo "⚡ Performance testing completed."
+          echo "Results are available in the artifacts section."
+          
+          # Check for critical failures
+          if [[ "${{ needs.micro-benchmarks.result }}" == "failure" ]] ||
+             [[ "${{ needs.load-testing.result }}" == "failure" ]] ||
+             [[ "${{ needs.stress-testing.result }}" == "failure" ]]; then
+            echo "⚠️ Some performance tests failed. Please review the results."
+          else
+            echo "✅ All performance tests passed successfully."
+          fi
+
+      - name: 📊 Collect Performance Summary Metrics
+        if: always()
+        uses: ./.github/actions/monitoring-action
+        with:
+          job_name: "Performance Summary"
+          step_name: "Summary Metrics Collection"
+          metric_type: "performance_summary"
+          tags: "micro_benchmarks=${{ needs.micro-benchmarks.result }},load_testing=${{ needs.load-testing.result }},stress_testing=${{ needs.stress-testing.result }}"

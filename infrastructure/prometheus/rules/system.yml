@@ -1,0 +1,21 @@
+groups:
+  - name: keiko.system
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: process_cpu_seconds_total > 0 and (rate(process_cpu_seconds_total[1m]) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hohe CPU-Auslastung"
+          description: "> 80% CPU für 5 Minuten"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / (1024 * 1024 * 1024) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hohe RAM-Auslastung"
+          description: "> 1.5 GiB RSS seit 5 Minuten"

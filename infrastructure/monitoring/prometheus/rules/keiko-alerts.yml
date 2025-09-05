@@ -1,0 +1,86 @@
+groups:
+  - name: keiko-backend-alerts
+    rules:
+      - alert: BackendHighErrorRate
+        expr: rate(http_requests_total{job="keiko-backend",code=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: keiko-backend
+        annotations:
+          summary: "High error rate in Keiko Backend"
+          description: "Error rate is {{ $value }} errors per second"
+
+      - alert: BackendHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="keiko-backend"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: keiko-backend
+        annotations:
+          summary: "High latency in Keiko Backend"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: BackendDown
+        expr: up{job="keiko-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: keiko-backend
+        annotations:
+          summary: "Keiko Backend is down"
+          description: "Keiko Backend has been down for more than 1 minute"
+
+  - name: keiko-frontend-alerts
+    rules:
+      - alert: FrontendDown
+        expr: up{job="keiko-frontend"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: keiko-frontend
+        annotations:
+          summary: "Keiko Frontend is down"
+          description: "Keiko Frontend has been down for more than 2 minutes"
+
+  - name: infrastructure-alerts
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90%"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80%"

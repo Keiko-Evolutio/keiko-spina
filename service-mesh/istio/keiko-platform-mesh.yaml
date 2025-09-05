@@ -1,0 +1,400 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: keiko-platform-mesh
+  namespace: istio-system
+spec:
+  values:
+    global:
+      meshID: keiko-mesh
+      network: keiko-network
+      
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        hpaSpec:
+          minReplicas: 2
+          maxReplicas: 5
+          
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        service:
+          type: LoadBalancer
+          ports:
+          - port: 80
+            targetPort: 8080
+            name: http2
+          - port: 443
+            targetPort: 8443
+            name: https
+          - port: 9000
+            targetPort: 9000
+            name: grpc
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+            
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keiko
+  labels:
+    istio-injection: enabled
+    name: keiko
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keiko-sdk
+  labels:
+    istio-injection: enabled
+    name: keiko-sdk
+
+---
+# Virtual Service für Backend
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: keiko-backend-vs
+  namespace: keiko
+spec:
+  hosts:
+  - keiko-backend-service
+  - api.keiko.dev
+  gateways:
+  - keiko-gateway
+  - mesh
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1/"
+    route:
+    - destination:
+        host: keiko-backend-service
+        port:
+          number: 8000
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+  - match:
+    - uri:
+        prefix: "/health"
+    route:
+    - destination:
+        host: keiko-backend-service
+        port:
+          number: 8000
+    timeout: 5s
+
+---
+# Virtual Service für Frontend
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: keiko-frontend-vs
+  namespace: keiko
+spec:
+  hosts:
+  - keiko-frontend-service
+  - app.keiko.dev
+  gateways:
+  - keiko-gateway
+  - mesh
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: keiko-frontend-service
+        port:
+          number: 3000
+    timeout: 30s
+
+---
+# Virtual Service für SDK
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: kei-agent-sdk-vs
+  namespace: keiko-sdk
+spec:
+  hosts:
+  - kei-agent-sdk-service
+  - sdk.keiko.dev
+  gateways:
+  - keiko-gateway
+  - mesh
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1/"
+    route:
+    - destination:
+        host: kei-agent-sdk-service
+        port:
+          number: 8080
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+  - match:
+    - uri:
+        prefix: "/grpc"
+    route:
+    - destination:
+        host: kei-agent-sdk-service
+        port:
+          number: 9001
+    timeout: 120s
+
+---
+# Gateway Configuration
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: keiko-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*.keiko.dev"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: keiko-tls-cert
+    hosts:
+    - "*.keiko.dev"
+  - port:
+      number: 9000
+      name: grpc
+      protocol: GRPC
+    hosts:
+    - "*.keiko.dev"
+
+---
+# Destination Rules für Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: keiko-backend-dr
+  namespace: keiko
+spec:
+  host: keiko-backend-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: canary
+    labels:
+      version: canary
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: kei-agent-sdk-dr
+  namespace: keiko-sdk
+spec:
+  host: kei-agent-sdk-service
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 5
+        consecutiveGatewayErrors: 3
+        interval: 60s
+        baseEjectionTime: 60s
+    circuitBreaker:
+      consecutiveGatewayErrors: 3
+      interval: 60s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 30
+
+---
+# Service Entry für externe Services
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-apis
+  namespace: keiko
+spec:
+  hosts:
+  - api.openai.com
+  - api.anthropic.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Authorization Policies
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: keiko-backend-authz
+  namespace: keiko
+spec:
+  selector:
+    matchLabels:
+      app: keiko-backend
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/keiko/sa/keiko-frontend-sa"]
+    - source:
+        principals: ["cluster.local/ns/keiko-sdk/sa/kei-agent-sdk-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/v1/*", "/health"]
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: kei-agent-sdk-authz
+  namespace: keiko-sdk
+spec:
+  selector:
+    matchLabels:
+      app: kei-agent-sdk
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/keiko/sa/keiko-backend-sa"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/api/v1/*", "/grpc/*", "/health"]
+
+---
+# Peer Authentication für mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: keiko
+spec:
+  mtls:
+    mode: STRICT
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: keiko-sdk
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Telemetry Configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: keiko-metrics
+  namespace: istio-system
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        source_service_name:
+          value: "%{SOURCE_SERVICE_NAME}"
+        destination_service_name:
+          value: "%{DESTINATION_SERVICE_NAME}"
+
+---
+# Envoy Filter für erweiterte Konfiguration
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: keiko-cors-filter
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.cors
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors

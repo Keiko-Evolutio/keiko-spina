@@ -1,0 +1,118 @@
+# Edge Load Balancer Dockerfile
+# Intelligenter Load Balancer für Edge-Node-Routing
+
+# =============================================================================
+# Base Stage - Python Runtime
+# =============================================================================
+FROM python:3.11-slim as base
+
+# System-Dependencies installieren
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python-Umgebung konfigurieren
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Arbeitsverzeichnis erstellen
+WORKDIR /app
+
+# =============================================================================
+# Dependencies Stage - Python-Pakete installieren
+# =============================================================================
+FROM base as dependencies
+
+# uv installieren
+RUN pip install uv==0.4.18
+
+# Dependency-Dateien kopieren
+COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
+
+# Dependencies installieren
+RUN uv sync --frozen --no-dev
+
+# Load-Balancing-spezifische Pakete (bereits in pyproject.toml enthalten)
+# RUN uv add scikit-learn asyncio-throttle
+
+# =============================================================================
+# Development Stage - Für lokale Entwicklung
+# =============================================================================
+FROM dependencies as development
+
+# Development-Dependencies installieren
+RUN uv sync --frozen
+
+# Backend-Code kopieren
+COPY backend/ ./backend/
+
+# Load-Balancer-spezifische Konfiguration
+COPY infrastructure/docker/edge/config/edge-load-balancer.yml ./config/edge-load-balancer.yml
+
+# Logs-Verzeichnis erstellen
+RUN mkdir -p /app/logs
+
+# Health Check Script
+COPY infrastructure/docker/edge/scripts/health-check.sh ./health-check.sh
+RUN chmod +x ./health-check.sh
+
+# Ports exponieren
+EXPOSE 8080 8081
+
+# Environment Variables
+ENV PYTHONPATH=/app \
+    EDGE_CONFIG_PATH=/app/config/edge-load-balancer.yml \
+    LOG_LEVEL=DEBUG
+
+# Startup-Script
+COPY infrastructure/docker/edge/scripts/start-edge-load-balancer.sh ./start.sh
+RUN chmod +x ./start.sh
+
+# Health Check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD ./health-check.sh edge-load-balancer 8081
+
+# Command
+CMD ["./start.sh"]
+
+# =============================================================================
+# Production Stage - Optimiert für Production
+# =============================================================================
+FROM dependencies as production
+
+# Nur Production-Code kopieren
+COPY backend/edge/ ./backend/edge/
+COPY backend/kei_logging.py ./backend/kei_logging.py
+COPY backend/__init__.py ./backend/__init__.py
+
+# Load-Balancer-spezifische Dateien
+COPY infrastructure/docker/edge/config/edge-load-balancer.prod.yml ./config/edge-load-balancer.yml
+COPY infrastructure/docker/edge/scripts/start-edge-load-balancer.sh ./start.sh
+COPY infrastructure/docker/edge/scripts/health-check.sh ./health-check.sh
+
+RUN chmod +x ./start.sh ./health-check.sh
+
+# Non-root User erstellen
+RUN groupadd -r edge && useradd -r -g edge edge
+RUN chown -R edge:edge /app
+USER edge
+
+# Ports exponieren
+EXPOSE 8080 8081
+
+# Environment Variables
+ENV PYTHONPATH=/app \
+    EDGE_CONFIG_PATH=/app/config/edge-load-balancer.yml \
+    LOG_LEVEL=INFO
+
+# Health Check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD ./health-check.sh edge-load-balancer 8081
+
+# Command
+CMD ["./start.sh"]

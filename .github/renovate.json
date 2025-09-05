@@ -1,0 +1,147 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "security:openssf-scorecard",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "timezone": "Europe/Berlin",
+  "schedule": ["before 6am on Monday"],
+  "labels": ["dependencies"],
+  "assignees": ["oscharko"],
+  "reviewers": ["oscharko"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "stabilityDays": 3,
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Group Python dependencies",
+      "matchManagers": ["pip_requirements", "pip_setup", "pipenv", "poetry"],
+      "groupName": "Python dependencies",
+      "schedule": ["before 6am on Monday"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Group GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "schedule": ["before 6am on Monday"],
+      "minimumReleaseAge": "1 day"
+    },
+    {
+      "description": "Group Docker dependencies",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "groupName": "Docker dependencies",
+      "schedule": ["before 6am on Monday"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Auto-merge patch updates for stable packages",
+      "matchUpdateTypes": ["patch"],
+      "matchPackagePatterns": [
+        "^fastapi$",
+        "^uvicorn$",
+        "^pydantic$",
+        "^pytest",
+        "^ruff$",
+        "^mypy$"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "requiredStatusChecks": null
+    },
+    {
+      "description": "Security updates - high priority",
+      "matchUpdateTypes": ["patch"],
+      "matchDepTypes": ["dependencies"],
+      "vulnerabilityAlerts": true,
+      "labels": ["security", "dependencies"],
+      "prPriority": 10,
+      "schedule": ["at any time"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Development dependencies - lower priority",
+      "matchDepTypes": ["devDependencies"],
+      "prPriority": -1,
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Major updates - manual review required",
+      "matchUpdateTypes": ["major"],
+      "labels": ["major-update", "dependencies"],
+      "prPriority": 5,
+      "schedule": ["before 6am on first day of month"],
+      "minimumReleaseAge": "7 days"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "labels": ["security", "vulnerability"],
+    "prPriority": 20
+  },
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on Monday"],
+    "commitMessageAction": "Lock file maintenance"
+  },
+  "pip_requirements": {
+    "fileMatch": ["(^|/)requirements.*\\.txt$", "(^|/)requirements.*\\.in$"]
+  },
+  "regexManagers": [
+    {
+      "description": "Update Python version in pyproject.toml",
+      "fileMatch": ["(^|/)pyproject\\.toml$"],
+      "matchStrings": [
+        "requires-python\\s*=\\s*\">=(?<currentValue>.*?)\""
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "github-releases",
+      "lookupNameTemplate": "python/cpython"
+    },
+    {
+      "description": "Update Python version in GitHub Actions",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": [
+        "python-version:\\s*[\"'](?<currentValue>.*?)[\"']"
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "github-releases",
+      "lookupNameTemplate": "python/cpython"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Docker base images",
+      "fileMatch": ["(^|/)Dockerfile$"],
+      "matchStrings": [
+        "FROM (?<depName>.*?):(?<currentValue>.*?)@sha256"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "commitMessagePrefix": "📦",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "prTitle": "📦 Update {{depName}} to {{newVersion}}",
+  "prBodyTemplate": "This PR updates {{depName}} from {{currentVersion}} to {{newVersion}}.\n\n{{#if hasReleaseNotes}}\n## Release Notes\n\n{{releaseNotes}}\n{{/if}}\n\n{{#if hasChangelog}}\n## Changelog\n\n{{changelog}}\n{{/if}}\n\n---\n\n🤖 This PR was generated automatically by Renovate Bot.",
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/__tests__/**"
+  ],
+  "ignoreDeps": [
+    "python"
+  ]
+}

@@ -1,0 +1,247 @@
+# Edge Registry Configuration - Development
+# Zentrale Konfiguration für Edge-Node-Registry
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  name: "edge-registry"
+  version: "1.0.0"
+  environment: "development"
+  
+# =============================================================================
+# Server Configuration
+# =============================================================================
+server:
+  host: "0.0.0.0"
+  port: 8080
+  health_port: 8081
+  workers: 4
+  max_connections: 1000
+  keepalive_timeout: 65
+  request_timeout: 30
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+database:
+  postgres:
+    url: "${POSTGRES_URL}"
+    pool_size: 20
+    max_overflow: 30
+    pool_timeout: 30
+    pool_recycle: 3600
+    echo: false
+    
+  redis:
+    url: "${REDIS_URL}"
+    db: 2
+    max_connections: 50
+    retry_on_timeout: true
+    socket_timeout: 5
+    socket_connect_timeout: 5
+
+# =============================================================================
+# Edge Node Management
+# =============================================================================
+node_management:
+  # Node Registration
+  registration:
+    auto_approve: true
+    require_authentication: false
+    max_nodes_per_region: 50
+    node_timeout_seconds: 120
+    
+  # Health Monitoring
+  health_monitoring:
+    check_interval_seconds: 30
+    timeout_seconds: 10
+    max_failures: 3
+    recovery_check_interval: 60
+    
+  # Node Discovery
+  discovery:
+    enable_auto_discovery: true
+    discovery_interval_seconds: 300
+    discovery_timeout_seconds: 5
+
+# =============================================================================
+# Load Balancing Configuration
+# =============================================================================
+load_balancing:
+  default_strategy: "adaptive"
+  strategies:
+    round_robin:
+      enabled: true
+    least_connections:
+      enabled: true
+    latency_based:
+      enabled: true
+      latency_threshold_ms: 100
+    capacity_based:
+      enabled: true
+      capacity_threshold: 0.8
+    adaptive:
+      enabled: true
+      learning_rate: 0.1
+      exploration_rate: 0.1
+      decay_factor: 0.95
+      
+  # Routing Cache
+  routing_cache:
+    enabled: true
+    ttl_seconds: 60
+    max_entries: 10000
+
+# =============================================================================
+# Performance Monitoring
+# =============================================================================
+monitoring:
+  # Metrics Collection
+  metrics:
+    enabled: true
+    collection_interval_seconds: 10
+    retention_days: 7
+    export_prometheus: true
+    prometheus_port: 9090
+    
+  # Alerting
+  alerting:
+    enabled: true
+    evaluation_interval_seconds: 30
+    alert_rules:
+      - name: "high_node_latency"
+        condition: "avg_latency_ms > 100"
+        severity: "warning"
+        duration: "5m"
+      - name: "node_offline"
+        condition: "node_status == 'offline'"
+        severity: "critical"
+        duration: "1m"
+      - name: "high_error_rate"
+        condition: "error_rate > 0.05"
+        severity: "warning"
+        duration: "2m"
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Authentication
+  authentication:
+    enabled: false  # Disabled for development
+    jwt_secret: "${JWT_SECRET:-dev-secret}"
+    token_expiry_hours: 24
+    
+  # Authorization
+  authorization:
+    enabled: false  # Disabled for development
+    admin_roles: ["admin", "edge-admin"]
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+    burst_size: 100
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+api:
+  # Versioning
+  version: "v1"
+  base_path: "/api/v1"
+  
+  # CORS
+  cors:
+    enabled: true
+    allowed_origins: ["*"]  # Permissive for development
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    
+  # Documentation
+  docs:
+    enabled: true
+    swagger_ui: true
+    redoc: true
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "DEBUG"
+  format: "json"
+  
+  # Log Destinations
+  destinations:
+    console:
+      enabled: true
+      level: "DEBUG"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "/app/logs/edge-registry.log"
+      max_size_mb: 100
+      backup_count: 5
+      
+  # Structured Logging
+  structured:
+    enabled: true
+    include_trace_id: true
+    include_span_id: true
+    
+  # Log Sampling
+  sampling:
+    enabled: false  # Disabled for development
+
+# =============================================================================
+# OpenTelemetry Configuration
+# =============================================================================
+telemetry:
+  enabled: true
+  service_name: "edge-registry"
+  service_version: "1.0.0"
+  
+  # Tracing
+  tracing:
+    enabled: true
+    sampler: "always_on"  # For development
+    exporter: "otlp"
+    endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+    
+  # Metrics
+  metrics:
+    enabled: true
+    exporter: "prometheus"
+    endpoint: "0.0.0.0:9090"
+
+# =============================================================================
+# Development Configuration
+# =============================================================================
+development:
+  # Debug Features
+  debug:
+    enabled: true
+    detailed_errors: true
+    include_stack_traces: true
+    
+  # Hot Reload
+  hot_reload:
+    enabled: true
+    watch_paths: ["/app/backend"]
+    
+  # Test Data
+  test_data:
+    enabled: true
+    create_sample_nodes: true
+    sample_node_count: 3
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+features:
+  auto_scaling: true
+  geographic_routing: true
+  model_caching: true
+  performance_optimization: true
+  advanced_monitoring: true

@@ -1,0 +1,68 @@
+groups:
+  - name: keiko-business-kpis
+    rules:
+      - alert: KeikoAgentSuccessRateLow
+        expr: (sum by (tenant_id) (rate(keiko_agent_tasks_total{status="success"}[5m])) / sum by (tenant_id) (rate(keiko_agent_tasks_total[5m]))) < 0.995
+        for: 5m
+        labels:
+          severity: warning
+          team: keiko
+        annotations:
+          summary: "Agent Erfolgsrate niedrig (<99.5%)"
+          description: "Agent Erfolgsrate ist unter 99.5% gefallen. Prüfe Agent Logs und Downstream Dienste."
+          runbook: "https://docs.keiko.local/runbooks/agent-success"
+
+      - alert: KeikoAgentSuccessRateCritical
+        expr: (sum by (tenant_id) (rate(keiko_agent_tasks_total{status="success"}[5m])) / sum by (tenant_id) (rate(keiko_agent_tasks_total[5m]))) < 0.99
+        for: 5m
+        labels:
+          severity: critical
+          team: keiko
+        annotations:
+          summary: "Agent Erfolgsrate kritisch (<99%)"
+          description: "Kritische Agent Erfolgsrate. Sofortige Untersuchung erforderlich."
+          runbook: "https://docs.keiko.local/runbooks/agent-success"
+
+      - alert: KeikoWebsocketConnectionsHigh
+        expr: keiko_websocket_connections_active > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: keiko
+        annotations:
+          summary: "Viele WebSocket Verbindungen (>1000)"
+          description: "Aktive WS-Verbindungen haben 1000 überschritten. Prüfe Skalierung und Leaks."
+          runbook: "https://docs.keiko.local/runbooks/websocket-scale"
+
+      - alert: KeikoWebsocketConnectionsCritical
+        expr: keiko_websocket_connections_active > 2000
+        for: 5m
+        labels:
+          severity: critical
+          team: keiko
+        annotations:
+          summary: "WebSocket Verbindungen kritisch (>2000)"
+          description: "Aktive WS Verbindungen > 2000. Skalierung/Rate-Limits prüfen."
+          runbook: "https://docs.keiko.local/runbooks/websocket-scale"
+
+      - alert: KeikoApiLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(keiko_http_request_duration_seconds_bucket[5m]))) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: keiko
+        annotations:
+          summary: "API Latenz P95 hoch (>200ms)"
+          description: "API P95 über 200ms. Prüfe Caching, DB und Upstream Dienste."
+          runbook: "https://docs.keiko.local/runbooks/api-latency"
+
+      - alert: KeikoApiLatencyCritical
+        expr: histogram_quantile(0.95, sum by (le) (rate(keiko_http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          team: keiko
+        annotations:
+          summary: "API Latenz P95 kritisch (>500ms)"
+          description: "API P95 über 500ms. Sofortige Untersuchung erforderlich."
+          runbook: "https://docs.keiko.local/runbooks/api-latency"

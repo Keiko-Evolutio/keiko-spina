@@ -1,0 +1,584 @@
+openapi: 3.0.3
+info:
+  title: Keiko Platform-SDK Management API
+  description: |
+    **Architektur-konforme Management API für Platform-SDK Kommunikation**
+    
+    Diese API ermöglicht SDK-Management und -Konfiguration durch:
+    - Agent-Registrierung und -Verwaltung
+    - Configuration Management
+    - Health Monitoring und Status-Updates
+    - Function Call Orchestration
+    
+    **Compliance:** Strikte API-basierte Kommunikation ohne direkte Backend-Dependencies.
+  version: 1.0.0
+  contact:
+    name: Keiko Architecture Team
+    email: architecture@keiko.dev
+
+servers:
+  - url: https://platform-api.keiko.dev/v1
+    description: Production Platform API
+  - url: https://staging-platform-api.keiko.dev/v1
+    description: Staging Platform API
+  - url: http://localhost:8000/v1
+    description: Local Development
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  /agents:
+    get:
+      summary: List Agents
+      description: Abrufen aller registrierten Agents
+      operationId: listAgents
+      tags:
+        - Agent Management
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: ["active", "inactive", "error", "maintenance"]
+        - name: agent_type
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentListResponse'
+
+    post:
+      summary: Register Agent
+      description: |
+        SDK registriert neuen Agent bei Platform.
+        Ersetzt direkte Backend-Registrierung durch API-Call.
+      operationId: registerAgent
+      tags:
+        - Agent Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegistrationRequest'
+      responses:
+        '201':
+          description: Agent successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+        '400':
+          description: Invalid agent data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Agent already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agents/{agent_id}:
+    get:
+      summary: Get Agent Details
+      description: Abrufen detaillierter Agent-Informationen
+      operationId: getAgent
+      tags:
+        - Agent Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update Agent
+      description: Aktualisierung von Agent-Konfiguration und -Status
+      operationId: updateAgent
+      tags:
+        - Agent Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdateRequest'
+      responses:
+        '200':
+          description: Agent successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+
+    delete:
+      summary: Deregister Agent
+      description: Entfernung eines Agents aus der Platform
+      operationId: deregisterAgent
+      tags:
+        - Agent Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      responses:
+        '204':
+          description: Agent successfully deregistered
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/functions:
+    get:
+      summary: List Agent Functions
+      description: Abrufen verfügbarer Functions eines Agents
+      operationId: listAgentFunctions
+      tags:
+        - Function Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      responses:
+        '200':
+          description: List of agent functions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionListResponse'
+
+    post:
+      summary: Register Agent Function
+      description: SDK registriert neue Function für Agent
+      operationId: registerAgentFunction
+      tags:
+        - Function Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunctionRegistrationRequest'
+      responses:
+        '201':
+          description: Function successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionResponse'
+
+  /agents/{agent_id}/functions/{function_name}/call:
+    post:
+      summary: Call Agent Function
+      description: |
+        Platform ruft Agent-Function über HTTP API auf.
+        Ersetzt direkte Function-Calls durch API-basierte Orchestration.
+      operationId: callAgentFunction
+      tags:
+        - Function Management
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+        - name: function_name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunctionCallRequest'
+      responses:
+        '200':
+          description: Function call successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionCallResponse'
+        '400':
+          description: Invalid function parameters
+        '404':
+          description: Agent or function not found
+        '500':
+          description: Function execution error
+
+  /config:
+    get:
+      summary: Get Platform Configuration
+      description: SDK abruft Platform-Konfiguration
+      operationId: getPlatformConfig
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Platform configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformConfigResponse'
+
+  /config/agents/{agent_id}:
+    get:
+      summary: Get Agent Configuration
+      description: Abrufen agent-spezifischer Konfiguration
+      operationId: getAgentConfig
+      tags:
+        - Configuration
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      responses:
+        '200':
+          description: Agent configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConfigResponse'
+
+    put:
+      summary: Update Agent Configuration
+      description: SDK aktualisiert Agent-Konfiguration
+      operationId: updateAgentConfig
+      tags:
+        - Configuration
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^agent_[a-zA-Z0-9_]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentConfigUpdateRequest'
+      responses:
+        '200':
+          description: Configuration successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConfigResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AgentRegistrationRequest:
+      type: object
+      required:
+        - agent_id
+        - agent_type
+        - capabilities
+      properties:
+        agent_id:
+          type: string
+          pattern: '^agent_[a-zA-Z0-9_]+$'
+          description: Eindeutige Agent-ID
+        agent_type:
+          type: string
+          enum:
+            - "code_assistant"
+            - "data_analyst"
+            - "workflow_manager"
+            - "monitoring_agent"
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Agent-Fähigkeiten
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        config:
+          type: object
+          description: Initial agent configuration
+
+    AgentUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: ["active", "inactive", "error", "maintenance"]
+        capabilities:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    AgentResponse:
+      type: object
+      required:
+        - agent_id
+        - agent_type
+        - status
+        - created_at
+      properties:
+        agent_id:
+          type: string
+        agent_type:
+          type: string
+        status:
+          type: string
+          enum: ["active", "inactive", "error", "maintenance"]
+        capabilities:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_seen:
+          type: string
+          format: date-time
+
+    AgentListResponse:
+      type: object
+      required:
+        - agents
+        - total
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResponse'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    FunctionRegistrationRequest:
+      type: object
+      required:
+        - function_name
+        - description
+        - parameters_schema
+      properties:
+        function_name:
+          type: string
+          pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+        description:
+          type: string
+        parameters_schema:
+          type: object
+          description: JSON Schema für Function-Parameter
+        return_schema:
+          type: object
+          description: JSON Schema für Return-Value
+
+    FunctionResponse:
+      type: object
+      required:
+        - function_name
+        - agent_id
+        - description
+      properties:
+        function_name:
+          type: string
+        agent_id:
+          type: string
+        description:
+          type: string
+        parameters_schema:
+          type: object
+        return_schema:
+          type: object
+        registered_at:
+          type: string
+          format: date-time
+
+    FunctionListResponse:
+      type: object
+      required:
+        - functions
+      properties:
+        functions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunctionResponse'
+
+    FunctionCallRequest:
+      type: object
+      required:
+        - parameters
+      properties:
+        parameters:
+          type: object
+          description: Function-Parameter
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+
+    FunctionCallResponse:
+      type: object
+      required:
+        - call_id
+        - status
+      properties:
+        call_id:
+          type: string
+        status:
+          type: string
+          enum: ["success", "error", "timeout"]
+        result:
+          type: object
+          description: Function-Ergebnis
+        error:
+          type: string
+          description: Error-Message bei Fehlern
+        execution_time_ms:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    PlatformConfigResponse:
+      type: object
+      properties:
+        api_version:
+          type: string
+        supported_protocols:
+          type: array
+          items:
+            type: string
+        rate_limits:
+          type: object
+        features:
+          type: object
+
+    AgentConfigResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        config:
+          type: object
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentConfigUpdateRequest:
+      type: object
+      required:
+        - config
+      properties:
+        config:
+          type: object
+          description: Neue Agent-Konfiguration
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+tags:
+  - name: Agent Management
+    description: Agent-Registrierung und -Verwaltung
+  - name: Function Management
+    description: Function-Registrierung und -Orchestration
+  - name: Configuration
+    description: Konfigurations-Management

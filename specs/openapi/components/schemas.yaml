@@ -1,0 +1,603 @@
+# specs/openapi/components/schemas.yaml
+# Vollständige Schema-Definitionen für KEI-Agent-Framework Management API
+
+components:
+  schemas:
+    # Basis-Schemas
+    AccessLevel:
+      type: string
+      enum: [private, shared, public, restricted]
+      description: Zugriffslevel für Tenant-übergreifende Operationen
+      example: "private"
+
+    RolloutStatus:
+      type: string
+      enum: [pending, in_progress, paused, completed, failed, rolled_back, cancelled]
+      description: Status eines Rollouts
+      example: "in_progress"
+
+    RolloutStrategy:
+      type: string
+      enum: [immediate, canary, blue_green, rolling, feature_flag]
+      description: Rollout-Strategie für Agent-Deployments
+      example: "canary"
+
+    DiscoveryStrategy:
+      type: string
+      enum: [capability_based, health_based, load_based, geographic, hybrid]
+      description: Discovery-Strategie für Agent-Suche
+      example: "hybrid"
+
+    AgentStatus:
+      type: string
+      enum: [available, unavailable, deprecated, maintenance, rollout, canary, blue_green, failed]
+      description: Status eines Agents
+      example: "available"
+
+    # Request-Schemas
+    AgentRegistrationRequest:
+      type: object
+      required: [agent_id, name, version, tenant_id]
+      properties:
+        agent_id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          minLength: 1
+          maxLength: 255
+          description: Eindeutige Agent-ID
+          example: "chatbot-pro"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Anzeigename des Agents
+          example: "Professional Chatbot"
+        version:
+          type: string
+          pattern: '^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+          description: Semantische Version (SemVer)
+          example: "1.0.0"
+        tenant_id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          minLength: 1
+          maxLength: 64
+          description: Tenant-ID
+          example: "enterprise-corp"
+        description:
+          type: string
+          maxLength: 1000
+          description: Beschreibung des Agents
+          example: "Enterprise-grade Chatbot für Kundensupport"
+        capabilities:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+          maxItems: 50
+          description: Liste der Agent-Capabilities
+          example: ["chat", "nlp", "sentiment_analysis"]
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          maxItems: 50
+          description: Tags für Kategorisierung
+          example: ["chatbot", "production", "enterprise"]
+        owner:
+          type: string
+          maxLength: 128
+          description: Besitzer des Agents
+          example: "team-ai"
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
+        framework_version_constraint:
+          type: string
+          description: Framework-Versions-Constraint
+          example: "^1.0.0"
+        dependencies:
+          type: object
+          additionalProperties:
+            type: string
+          description: Agent-Dependencies mit Versions-Constraints
+          example:
+            "nlp-service": "^2.1.0"
+            "sentiment-analyzer": "~1.5.0"
+
+    AgentUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Neuer Anzeigename
+        description:
+          type: string
+          maxLength: 1000
+          description: Neue Beschreibung
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          maxItems: 50
+          description: Neue Tags
+        owner:
+          type: string
+          maxLength: 128
+          description: Neuer Besitzer
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+
+    TenantRegistrationRequest:
+      type: object
+      required: [tenant_id, tenant_name]
+      properties:
+        tenant_id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          minLength: 1
+          maxLength: 64
+          description: Eindeutige Tenant-ID
+          example: "enterprise-corp"
+        tenant_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Anzeigename des Tenants
+          example: "Enterprise Corporation"
+        organization:
+          type: string
+          maxLength: 255
+          description: Organisation
+          example: "Enterprise Corp Ltd."
+        contact_email:
+          type: string
+          format: email
+          description: Kontakt-E-Mail
+          example: "admin@enterprise-corp.com"
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
+        resource_quotas:
+          type: object
+          properties:
+            max_agents:
+              type: integer
+              minimum: 1
+              description: Maximale Anzahl Agents
+              example: 50
+            max_versions_per_agent:
+              type: integer
+              minimum: 1
+              description: Maximale Versionen pro Agent
+              example: 10
+            max_storage_mb:
+              type: integer
+              minimum: 1
+              description: Maximaler Speicher in MB
+              example: 5120
+            max_requests_per_hour:
+              type: integer
+              minimum: 1
+              description: Maximale Requests pro Stunde
+              example: 100000
+            max_concurrent_deployments:
+              type: integer
+              minimum: 1
+              description: Maximale gleichzeitige Deployments
+              example: 5
+          description: Ressourcen-Quotas
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          maxItems: 20
+          description: Tenant-Tags
+          example: ["enterprise", "production"]
+
+    DiscoveryRequest:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          description: Spezifische Agent-ID (optional)
+          example: "chatbot-pro"
+        version_constraint:
+          type: string
+          description: Versions-Constraint (optional)
+          example: "^1.0.0"
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Erforderliche Capabilities
+          example: ["chat", "nlp"]
+        tenant_id:
+          type: string
+          description: Tenant-ID für Zugriffsprüfung
+          example: "enterprise-corp"
+        strategy:
+          $ref: '#/components/schemas/DiscoveryStrategy'
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Maximale Anzahl Ergebnisse
+        min_health_score:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.7
+          description: Minimaler Health-Score
+        max_load_factor:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.9
+          description: Maximaler Load-Factor
+        client_location:
+          $ref: '#/components/schemas/GeographicLocation'
+        max_distance_km:
+          type: number
+          minimum: 0
+          description: Maximale Distanz in Kilometern
+          example: 1000
+        preferred_regions:
+          type: array
+          items:
+            type: string
+          description: Bevorzugte Regionen
+          example: ["eu-west-1", "eu-central-1"]
+        exclude_instances:
+          type: array
+          items:
+            type: string
+          description: Auszuschließende Instanz-IDs
+        require_endpoints:
+          type: boolean
+          default: false
+          description: Erfordert verfügbare Endpoints
+
+    RolloutRequest:
+      type: object
+      required: [agent_id, source_version, target_version, tenant_id]
+      properties:
+        agent_id:
+          type: string
+          description: Agent-ID
+          example: "chatbot-pro"
+        source_version:
+          type: string
+          description: Quell-Version
+          example: "1.0.0"
+        target_version:
+          type: string
+          description: Ziel-Version
+          example: "1.1.0"
+        tenant_id:
+          type: string
+          description: Tenant-ID
+          example: "enterprise-corp"
+        strategy:
+          $ref: '#/components/schemas/RolloutStrategy'
+        canary_percentage:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          default: 10.0
+          description: Canary-Prozentsatz
+        canary_duration_minutes:
+          type: integer
+          minimum: 1
+          default: 60
+          description: Canary-Dauer in Minuten
+        blue_green_switch_delay_minutes:
+          type: integer
+          minimum: 1
+          default: 5
+          description: Blue-Green-Switch-Verzögerung
+        rolling_batch_size:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Rolling-Update-Batch-Größe
+        rolling_delay_seconds:
+          type: integer
+          minimum: 0
+          default: 30
+          description: Rolling-Update-Verzögerung
+        auto_rollback_on_error:
+          type: boolean
+          default: true
+          description: Automatischer Rollback bei Fehlern
+        success_threshold_percentage:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          default: 95.0
+          description: Erfolgs-Schwellwert
+        max_rollout_duration_minutes:
+          type: integer
+          minimum: 1
+          default: 120
+          description: Maximale Rollout-Dauer
+        feature_flags:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Feature-Flags für Rollout
+          example:
+            "new_ui": true
+            "enhanced_nlp": false
+        notification_channels:
+          type: array
+          items:
+            type: string
+          description: Benachrichtigungskanäle
+          example: ["slack", "email"]
+
+    RolloutControlRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [pause, resume, rollback, cancel, force_complete]
+          description: Rollout-Aktion
+          example: "pause"
+        reason:
+          type: string
+          maxLength: 500
+          description: Grund für die Aktion
+          example: "Kritischer Fehler erkannt"
+        force:
+          type: boolean
+          default: false
+          description: Erzwingt Aktion auch bei Konflikten
+
+    # Response-Schemas
+    AgentResponse:
+      type: object
+      required: [agent_id, name, version, tenant_id, status, access_level, created_at, updated_at]
+      properties:
+        agent_id:
+          type: string
+          description: Eindeutige Agent-ID
+          example: "chatbot-pro"
+        name:
+          type: string
+          description: Anzeigename des Agents
+          example: "Professional Chatbot"
+        version:
+          type: string
+          description: Agent-Version
+          example: "1.0.0"
+        tenant_id:
+          type: string
+          description: Tenant-ID
+          example: "enterprise-corp"
+        description:
+          type: string
+          description: Agent-Beschreibung
+          example: "Enterprise-grade Chatbot"
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Agent-Capabilities
+          example: ["chat", "nlp", "sentiment_analysis"]
+        tags:
+          type: array
+          items:
+            type: string
+          description: Agent-Tags
+          example: ["chatbot", "production"]
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
+        owner:
+          type: string
+          description: Agent-Besitzer
+          example: "team-ai"
+        created_at:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Letztes Update
+          example: "2024-01-15T10:30:00Z"
+        deprecated_at:
+          type: string
+          format: date-time
+          description: Deprecation-Zeitpunkt (falls deprecated)
+          example: "2024-02-15T10:30:00Z"
+        end_of_life_at:
+          type: string
+          format: date-time
+          description: End-of-Life-Zeitpunkt (falls deprecated)
+          example: "2024-05-15T10:30:00Z"
+        framework_version_constraint:
+          type: string
+          description: Framework-Versions-Constraint
+          example: "^1.0.0"
+        dependencies:
+          type: object
+          additionalProperties:
+            type: string
+          description: Agent-Dependencies
+        performance_metrics:
+          $ref: '#/components/schemas/PerformanceMetrics'
+        health_status:
+          $ref: '#/components/schemas/HealthMetrics'
+
+    TenantResponse:
+      type: object
+      required: [tenant_id, tenant_name, access_level, total_agents, created_at]
+      properties:
+        tenant_id:
+          type: string
+          description: Eindeutige Tenant-ID
+          example: "enterprise-corp"
+        tenant_name:
+          type: string
+          description: Anzeigename des Tenants
+          example: "Enterprise Corporation"
+        organization:
+          type: string
+          description: Organisation
+          example: "Enterprise Corp Ltd."
+        contact_email:
+          type: string
+          format: email
+          description: Kontakt-E-Mail
+          example: "admin@enterprise-corp.com"
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
+        total_agents:
+          type: integer
+          description: Anzahl registrierter Agents
+          example: 25
+        resource_quotas:
+          type: object
+          description: Aktuelle Ressourcen-Quotas und Nutzung
+          properties:
+            max_agents:
+              type: integer
+              example: 50
+            current_agents:
+              type: integer
+              example: 25
+            max_storage_mb:
+              type: integer
+              example: 5120
+            current_storage_mb:
+              type: integer
+              example: 2048
+            max_requests_per_hour:
+              type: integer
+              example: 100000
+            current_requests_per_hour:
+              type: integer
+              example: 45000
+        created_at:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+          example: "2024-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Letztes Update
+          example: "2024-01-15T10:30:00Z"
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tenant-Tags
+          example: ["enterprise", "production"]
+
+    RolloutResponse:
+      type: object
+      required: [rollout_id, agent_id, source_version, target_version, tenant_id, status, strategy]
+      properties:
+        rollout_id:
+          type: string
+          format: uuid
+          description: Eindeutige Rollout-ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        agent_id:
+          type: string
+          description: Agent-ID
+          example: "chatbot-pro"
+        source_version:
+          type: string
+          description: Quell-Version
+          example: "1.0.0"
+        target_version:
+          type: string
+          description: Ziel-Version
+          example: "1.1.0"
+        tenant_id:
+          type: string
+          description: Tenant-ID
+          example: "enterprise-corp"
+        status:
+          $ref: '#/components/schemas/RolloutStatus'
+        strategy:
+          $ref: '#/components/schemas/RolloutStrategy'
+        current_phase:
+          type: string
+          enum: [preparation, canary, validation, full_deployment, monitoring, cleanup]
+          description: Aktuelle Rollout-Phase
+          example: "canary"
+        started_at:
+          type: string
+          format: date-time
+          description: Start-Zeitpunkt
+          example: "2024-01-15T10:30:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          description: Abschluss-Zeitpunkt
+          example: "2024-01-15T11:30:00Z"
+        next_phase_at:
+          type: string
+          format: date-time
+          description: Nächste Phase geplant für
+          example: "2024-01-15T10:45:00Z"
+        metrics:
+          $ref: '#/components/schemas/RolloutMetrics'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolloutEvent'
+          description: Rollout-Events
+        configuration:
+          type: object
+          description: Rollout-Konfiguration
+          properties:
+            canary_percentage:
+              type: number
+              example: 10.0
+            auto_rollback_on_error:
+              type: boolean
+              example: true
+            success_threshold_percentage:
+              type: number
+              example: 95.0
+
+    DiscoveryResult:
+      type: object
+      required: [agent, score]
+      properties:
+        agent:
+          $ref: '#/components/schemas/AgentResponse'
+        score:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Discovery-Score (0.0 - 1.0)
+          example: 0.95
+        match_reasons:
+          type: array
+          items:
+            type: string
+          description: Gründe für Match
+          example: ["Excellent health score", "Low load", "Close location"]
+        distance_km:
+          type: number
+          minimum: 0
+          description: Distanz in Kilometern (falls geografische Discovery)
+          example: 150.5
+        instance_info:
+          $ref: '#/components/schemas/AgentInstanceInfo'

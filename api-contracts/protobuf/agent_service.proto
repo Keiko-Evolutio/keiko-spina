@@ -1,0 +1,339 @@
+syntax = "proto3";
+
+package keiko.backend.sdk.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/keiko-dev/keiko-backend/proto/sdk/v1";
+option java_multiple_files = true;
+option java_package = "ai.keiko.backend.sdk.v1";
+
+// Agent Service for Backend-SDK communication
+service AgentService {
+  // Register an agent with the backend
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  
+  // Unregister an agent
+  rpc UnregisterAgent(UnregisterAgentRequest) returns (UnregisterAgentResponse);
+  
+  // Call a function on an agent
+  rpc CallAgent(CallAgentRequest) returns (CallAgentResponse);
+  
+  // Stream agent events (bidirectional)
+  rpc StreamAgentEvents(stream StreamAgentEventsRequest) returns (stream AgentEvent);
+  
+  // Get agent status
+  rpc GetAgentStatus(GetAgentStatusRequest) returns (GetAgentStatusResponse);
+  
+  // List all registered agents
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  
+  // Health check
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
+}
+
+// Function Management Service
+service FunctionService {
+  // Register a function
+  rpc RegisterFunction(RegisterFunctionRequest) returns (RegisterFunctionResponse);
+  
+  // Unregister a function
+  rpc UnregisterFunction(UnregisterFunctionRequest) returns (UnregisterFunctionResponse);
+  
+  // List available functions
+  rpc ListFunctions(ListFunctionsRequest) returns (ListFunctionsResponse);
+  
+  // Call a function directly
+  rpc CallFunction(CallFunctionRequest) returns (CallFunctionResponse);
+}
+
+// Agent Registration Messages
+message RegisterAgentRequest {
+  string agent_id = 1;                    // Unique agent identifier
+  string agent_type = 2;                  // Type of agent
+  repeated string capabilities = 3;        // Agent capabilities
+  map<string, string> metadata = 4;       // Additional metadata
+  AgentConfig config = 5;                 // Agent configuration
+}
+
+message RegisterAgentResponse {
+  string agent_id = 1;                    // Agent identifier
+  string platform_agent_id = 2;          // Platform-assigned ID
+  bool registered = 3;                    // Registration success
+  google.protobuf.Timestamp registered_at = 4; // Registration timestamp
+  string message = 5;                     // Response message
+}
+
+message UnregisterAgentRequest {
+  string agent_id = 1;                    // Agent to unregister
+  string reason = 2;                      // Reason for unregistration
+}
+
+message UnregisterAgentResponse {
+  bool success = 1;                       // Unregistration success
+  string message = 2;                     // Response message
+}
+
+// Function Call Messages
+message CallAgentRequest {
+  string request_id = 1;                  // Unique request identifier
+  string agent_id = 2;                    // Target agent
+  string function_name = 3;               // Function to call
+  map<string, FunctionParameter> parameters = 4; // Function parameters
+  string user_id = 5;                     // User context
+  string session_id = 6;                  // Session context
+  int32 timeout_seconds = 7;              // Request timeout
+  int32 priority = 8;                     // Request priority
+}
+
+message CallAgentResponse {
+  string request_id = 1;                  // Request identifier
+  string agent_id = 2;                    // Responding agent
+  bool success = 3;                       // Call success
+  FunctionResult result = 4;              // Function result
+  string error = 5;                       // Error message (if failed)
+  int64 execution_time_ms = 6;            // Execution time
+  google.protobuf.Timestamp timestamp = 7; // Response timestamp
+}
+
+// Event Streaming Messages
+message StreamAgentEventsRequest {
+  string agent_id = 1;                    // Agent to stream events for
+  repeated string event_types = 2;        // Event types to subscribe to
+  map<string, string> filters = 3;        // Additional filters
+}
+
+message AgentEvent {
+  string event_id = 1;                    // Unique event identifier
+  string event_type = 2;                  // Type of event
+  string agent_id = 3;                    // Source agent
+  google.protobuf.Timestamp timestamp = 4; // Event timestamp
+  map<string, string> data = 5;           // Event data
+  EventSeverity severity = 6;             // Event severity
+}
+
+// Agent Status Messages
+message GetAgentStatusRequest {
+  string agent_id = 1;                    // Agent identifier
+}
+
+message GetAgentStatusResponse {
+  string agent_id = 1;                    // Agent identifier
+  AgentStatus status = 2;                 // Current status
+  repeated string capabilities = 3;        // Current capabilities
+  AgentMetrics metrics = 4;               // Performance metrics
+  google.protobuf.Timestamp last_activity = 5; // Last activity
+}
+
+// Agent Listing Messages
+message ListAgentsRequest {
+  AgentStatus status_filter = 1;          // Filter by status
+  string capability_filter = 2;           // Filter by capability
+  int32 page_size = 3;                    // Pagination size
+  string page_token = 4;                  // Pagination token
+}
+
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;          // List of agents
+  string next_page_token = 2;             // Next page token
+  int32 total_count = 3;                  // Total agent count
+}
+
+// Function Management Messages
+message RegisterFunctionRequest {
+  string function_id = 1;                 // Unique function identifier
+  string function_name = 2;               // Function name
+  string description = 3;                 // Function description
+  FunctionSchema schema = 4;              // Function schema
+  string agent_id = 5;                    // Owning agent
+  repeated string tags = 6;               // Function tags
+}
+
+message RegisterFunctionResponse {
+  string function_id = 1;                 // Function identifier
+  bool registered = 2;                    // Registration success
+  string message = 3;                     // Response message
+}
+
+message UnregisterFunctionRequest {
+  string function_id = 1;                 // Function to unregister
+  string agent_id = 2;                    // Owning agent
+}
+
+message UnregisterFunctionResponse {
+  bool success = 1;                       // Unregistration success
+  string message = 2;                     // Response message
+}
+
+message ListFunctionsRequest {
+  string agent_id = 1;                    // Filter by agent
+  string tag_filter = 2;                  // Filter by tag
+  int32 page_size = 3;                    // Pagination size
+  string page_token = 4;                  // Pagination token
+}
+
+message ListFunctionsResponse {
+  repeated FunctionInfo functions = 1;     // List of functions
+  string next_page_token = 2;             // Next page token
+  int32 total_count = 3;                  // Total function count
+}
+
+message CallFunctionRequest {
+  string request_id = 1;                  // Unique request identifier
+  string function_id = 2;                 // Function to call
+  map<string, FunctionParameter> parameters = 3; // Function parameters
+  string user_id = 4;                     // User context
+  string session_id = 5;                  // Session context
+  int32 timeout_seconds = 6;              // Request timeout
+}
+
+message CallFunctionResponse {
+  string request_id = 1;                  // Request identifier
+  string function_id = 2;                 // Called function
+  bool success = 3;                       // Call success
+  FunctionResult result = 4;              // Function result
+  string error = 5;                       // Error message (if failed)
+  int64 execution_time_ms = 6;            // Execution time
+}
+
+// Health Check Messages
+message HealthCheckResponse {
+  ServiceStatus status = 1;               // Service status
+  string version = 2;                     // Service version
+  google.protobuf.Timestamp timestamp = 3; // Health check timestamp
+  map<string, ServiceStatus> dependencies = 4; // Dependency status
+  SystemMetrics metrics = 5;              // System metrics
+}
+
+// Core Data Types
+message AgentConfig {
+  int32 max_concurrent_requests = 1;      // Max concurrent requests
+  int32 timeout_seconds = 2;              // Default timeout
+  bool enable_metrics = 3;                // Enable metrics collection
+  map<string, string> settings = 4;       // Additional settings
+}
+
+message AgentInfo {
+  string agent_id = 1;                    // Agent identifier
+  string platform_agent_id = 2;          // Platform ID
+  string agent_type = 3;                  // Agent type
+  AgentStatus status = 4;                 // Current status
+  repeated string capabilities = 5;        // Capabilities
+  google.protobuf.Timestamp registered_at = 6; // Registration time
+  google.protobuf.Timestamp last_activity = 7; // Last activity
+  AgentMetrics metrics = 8;               // Performance metrics
+}
+
+message AgentMetrics {
+  int64 total_requests = 1;               // Total requests processed
+  int64 successful_requests = 2;          // Successful requests
+  int64 failed_requests = 3;              // Failed requests
+  double average_response_time_ms = 4;    // Average response time
+  google.protobuf.Timestamp last_reset = 5; // Last metrics reset
+}
+
+message FunctionInfo {
+  string function_id = 1;                 // Function identifier
+  string function_name = 2;               // Function name
+  string description = 3;                 // Function description
+  string agent_id = 4;                    // Owning agent
+  FunctionSchema schema = 5;              // Function schema
+  repeated string tags = 6;               // Function tags
+  google.protobuf.Timestamp created_at = 7; // Creation timestamp
+}
+
+message FunctionSchema {
+  repeated FunctionParameter inputs = 1;   // Input parameters
+  FunctionParameter output = 2;           // Output specification
+  repeated string required_inputs = 3;    // Required input names
+}
+
+message FunctionParameter {
+  oneof value {
+    string string_value = 1;
+    int64 int_value = 2;
+    double double_value = 3;
+    bool bool_value = 4;
+    bytes bytes_value = 5;
+    FunctionParameterList list_value = 6;
+    FunctionParameterMap map_value = 7;
+  }
+  ParameterType type = 8;                 // Parameter type
+  string description = 9;                 // Parameter description
+  bool required = 10;                     // Whether parameter is required
+}
+
+message FunctionParameterList {
+  repeated FunctionParameter items = 1;
+}
+
+message FunctionParameterMap {
+  map<string, FunctionParameter> items = 1;
+}
+
+message FunctionResult {
+  oneof result {
+    string string_result = 1;
+    int64 int_result = 2;
+    double double_result = 3;
+    bool bool_result = 4;
+    bytes bytes_result = 5;
+    FunctionResultList list_result = 6;
+    FunctionResultMap map_result = 7;
+  }
+  string content_type = 8;                // Result content type
+}
+
+message FunctionResultList {
+  repeated FunctionResult items = 1;
+}
+
+message FunctionResultMap {
+  map<string, FunctionResult> items = 1;
+}
+
+message SystemMetrics {
+  double cpu_usage_percent = 1;           // CPU usage percentage
+  double memory_usage_percent = 2;        // Memory usage percentage
+  double disk_usage_percent = 3;          // Disk usage percentage
+  int64 active_connections = 4;           // Active connections
+  int64 total_requests = 5;               // Total requests served
+}
+
+// Enumerations
+enum AgentStatus {
+  AGENT_STATUS_UNKNOWN = 0;
+  AGENT_STATUS_ONLINE = 1;
+  AGENT_STATUS_OFFLINE = 2;
+  AGENT_STATUS_BUSY = 3;
+  AGENT_STATUS_ERROR = 4;
+  AGENT_STATUS_INITIALIZING = 5;
+  AGENT_STATUS_SHUTTING_DOWN = 6;
+}
+
+enum ServiceStatus {
+  SERVICE_STATUS_UNKNOWN = 0;
+  SERVICE_STATUS_HEALTHY = 1;
+  SERVICE_STATUS_DEGRADED = 2;
+  SERVICE_STATUS_UNHEALTHY = 3;
+}
+
+enum EventSeverity {
+  EVENT_SEVERITY_UNKNOWN = 0;
+  EVENT_SEVERITY_INFO = 1;
+  EVENT_SEVERITY_WARNING = 2;
+  EVENT_SEVERITY_ERROR = 3;
+  EVENT_SEVERITY_CRITICAL = 4;
+}
+
+enum ParameterType {
+  PARAMETER_TYPE_UNKNOWN = 0;
+  PARAMETER_TYPE_STRING = 1;
+  PARAMETER_TYPE_INTEGER = 2;
+  PARAMETER_TYPE_DOUBLE = 3;
+  PARAMETER_TYPE_BOOLEAN = 4;
+  PARAMETER_TYPE_BYTES = 5;
+  PARAMETER_TYPE_LIST = 6;
+  PARAMETER_TYPE_MAP = 7;
+}

@@ -1,0 +1,551 @@
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "keiko-backend"
+version = "1.0.0"
+description = "Keiko Personal Assistant Backend with Advanced Observability"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Keiko Development Team" },
+]
+keywords = [
+    "ai-assistant",
+    "personal-assistant",
+    "api",
+    "observability",
+    "opentelemetry",
+    "fastapi",
+    "monitoring",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "uvicorn[standard]>=0.35.0",
+    "starlette>=0.47.2",
+    "pydantic>=2.11.7",
+    "pydantic[email]>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "opentelemetry-api>=1.36.0",
+    "opentelemetry-sdk>=1.36.0",
+    "opentelemetry-instrumentation>=0.57b0",
+    "opentelemetry-instrumentation-fastapi>=0.57b0",
+    "opentelemetry-instrumentation-requests>=0.57b0",
+    "opentelemetry-instrumentation-httpx>=0.57b0",
+    "opentelemetry-instrumentation-urllib3>=0.57b0",
+    "opentelemetry-instrumentation-redis>=0.57b0",
+    "opentelemetry-exporter-otlp>=1.36.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.36.0",
+    "opentelemetry-propagator-b3>=1.36.0",
+    "opentelemetry-semantic-conventions>=0.57b0",
+    # Pydantic Logfire Integration
+    "logfire[sqlalchemy,system-metrics]>=4.3.5",
+    "opentelemetry-exporter-prometheus>=0.57b0",
+    "opentelemetry-resource-detector-azure>=0.1.5",
+    "opentelemetry-resourcedetector-gcp>=1.9.0a0",
+    "httpx>=0.28.1",
+    "aiohttp>=3.12.15",
+    "redis>=6.4.0",
+    "redis[hiredis]>=5.0.0",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.9",
+    "sqlalchemy[asyncio]>=2.0.43",
+    "alembic>=1.16.4",
+    "azure-monitor-opentelemetry>=1.6.13",
+    "azure-identity>=1.24.0",
+    "azure-keyvault-secrets>=4.10.0",
+    "azure-storage-blob>=12.26.0",
+    "python-dotenv>=1.1.1",
+    "pyyaml>=6.0.2",
+    "python-jose[cryptography]>=3.5.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.20",
+    "websockets>=15.0.1",
+    "python-socketio>=5.13.0",
+    "orjson>=3.11.1",
+    "msgpack>=1.1.1",
+    "structlog>=25.4.0",
+    "sentry-sdk[fastapi]>=2.34.1",
+    "python-dateutil>=2.9.0.post0",
+    "pytz>=2025.2",
+    "rich>=14.1.0",
+    "click>=8.2.1",
+    "pre-commit>=4.3.0",
+    "prometheus-client>=0.22.1",
+    "azure-ai-projects>=1.0.0",
+    "azure-ai-agents>=1.1.0",
+    "jinja2>=3.1.6",
+    "fastapi[all]>=0.116.1",
+    "openai>=1.99.9",
+    "azure-cosmos>=4.9.0",
+    "aiofiles>=24.1.0",
+    "prompty>=0.1.50",
+    "opentelemetry-instrumentation-logging>=0.57b0",
+    "neoteroi-mkdocs>=1.1.3",
+    "pymdown-extensions>=10.16.1",
+    "backoff>=2.2.1",
+    "azure-ai-inference>=1.0.0b9",
+    "foundry-ai>=0.1.0",
+    "azure-ai-evaluation>=1.10.0",
+    "azure-core>=1.35.0",
+    "tiktoken>=0.11.0",
+    "opencv-python>=4.12.0.88",
+    "langchain-core>=0.3.74",
+    "langgraph>=0.6.4",
+    "langsmith>=0.4.13",
+    "langchain-openai>=0.3.29",
+    "graphviz>=0.21",
+    "jsonschema>=4.25.0",
+    "networkx>=3.5",
+    "pydot>=4.0.1",
+    "grpcio>=1.74.0",
+    "grpcio-tools>=1.74.0",
+    "grpcio-reflection>=1.74.0",
+    "grpcio-status>=1.74.0",
+    "googleapis-common-protos>=1.70.0",
+    "nats-py>=2.11.0",
+    "cryptography>=45.0.6",
+    "aiokafka>=0.12.0",
+    "fastavro>=1.12.0",
+    "pyotp>=2.9.0",
+    "qrcode>=8.2",
+    "pillow>=11.3.0",
+    "anthropic>=0.64.0",
+    # Docker integration for startup orchestration
+    "docker>=6.1.0",
+    "scikit-learn>=1.7.1",
+    "pandas>=2.3.2",
+    "numpy>=2.2.6",
+    "xgboost>=3.0.4",
+    "joblib>=1.5.2",
+    "PyMuPDF>=1.25.0",
+]
+
+[project.license]
+text = "MIT"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
+    "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-randomly>=3.16.0",
+    "pytest-benchmark>=5.1.0",
+    "pytest-clarity>=1.0.1",
+    "pytest-sugar>=1.0.0",
+    "pytest-httpx>=0.35.0",
+    "coverage[toml]>=7.10.3",
+    "openapi-generator-cli>=7.14.0",
+    "apispec[yaml]>=6.8.2",
+    "openapi-spec-validator>=0.7.2",
+    "ruff>=0.12.8",
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "bandit[toml]>=1.8.6",
+    "mypy>=1.17.1",
+    "pip-audit>=2.9.0",
+    "types-redis>=4.6.0.20241004",
+    "types-python-dateutil>=2.9.0.20250809",
+    "types-pytz>=2025.2.0.20250809",
+    "types-requests>=2.32.4.20250809",
+    "types-pyyaml>=6.0.12.20250809",
+    "pre-commit>=4.3.0",
+    "commitizen>=4.8.3",
+    "rich-click>=1.8.9",
+    "httpie>=3.2.4",
+    "watchfiles>=1.1.0",
+    "ipython>=9.4.0",
+    "ipdb>=0.13.13",
+    "memory-profiler>=0.61.0",
+    "line-profiler>=5.0.0",
+    "py-spy>=0.4.1",
+    "pact-python>=2.3.3",
+    "locust>=2.38.1",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.16",
+    "neoteroi-mkdocs>=1.1.3",
+    "mkdocs-awesome-pages-plugin>=2.10.1",
+    "mkdocs-git-revision-date-localized-plugin>=1.4.7",
+    "mkdocs-minify-plugin>=0.8.0",
+    "mkdocs-mermaid2-plugin>=1.2.1",
+    "mkdocstrings[python]>=0.26.2",
+    "pygments>=2.19.2",
+    "testcontainers[compose]>=4.9.0",
+]
+test = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
+    "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-randomly>=3.16.0",
+    "pytest-benchmark>=5.1.0",
+    "pytest-clarity>=1.0.1",
+    "pytest-sugar>=1.0.0",
+    "pytest-httpx>=0.35.0",
+    "coverage[toml]>=7.10.3",
+    "httpx>=0.28.1",
+    "testcontainers[compose]>=4.9.0",
+]
+observability = [
+    "opentelemetry-exporter-otlp-proto-http>=1.36.0",
+    "opentelemetry-processor-baggage>=0.57b0",
+    "opentelemetry-propagator-jaeger>=1.36.0",
+    "opentelemetry-propagator-ot-trace>=0.57b0",
+    "prometheus-client>=0.22.1",
+    "grafana-client>=5.0.0",
+    "psutil>=7.0.0",
+    "py-cpuinfo>=9.0.0",
+]
+azure = [
+    "azure-monitor-opentelemetry-exporter>=1.0.0b41",
+    "azure-core>=1.35.0",
+    "azure-servicebus>=7.14.2",
+    "azure-cosmos>=4.9.0",
+    "azure-functions>=1.23.0",
+]
+deployment = [
+    "gunicorn>=23.0.0",
+    "uvloop>=0.21.0",
+    "httptools>=0.6.4",
+    "supervisor>=4.2.5",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
+    "ARG",
+    "SIM",
+    "TCH",
+    "D",
+    "S",
+    "N",
+    "ERA",
+    "PL",
+    "RUF",
+]
+ignore = [
+    "E501",
+    "B008",
+    "B904",
+    "D100",
+    "D104",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.isort]
+known-first-party = [
+    "keiko",
+    "monitoring",
+    "observability",
+]
+force-sort-within-sections = true
+split-on-trailing-comma = true
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "opentelemetry.*",
+    "pact.*",
+    "jaeger_client.*",
+    "azure.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--cov=.",
+    "--cov-branch",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml",
+    "--cov-fail-under=85",
+    "--durations=10",
+    "--disable-warnings",
+]
+testpaths = [
+    "tests",
+]
+python_files = [
+    "test_*.py",
+    "*_test.py",
+]
+python_classes = [
+    "Test*",
+]
+python_functions = [
+    "test_*",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "contract: marks tests as contract tests",
+    "agents: marks tests as agents tests",
+    "common: marks tests as common tests",
+    "azure: marks tests as azure tests",
+    "execution: marks tests as execution tests",
+    "observability: marks tests related to observability features",
+    "monitoring: marks tests related to monitoring features",
+    "perf: marks performance tests",
+    "performance: marks performance tests for latency and throughput",
+    "system: marks system-level tests",
+    "reliability: marks fault-tolerance and recovery tests",
+    "voice: marks voice-system specific tests",
+    "mcp: marks MCP client and server tests",
+    "error_recovery: marks error-handling and recovery tests",
+    "enterprise: marks enterprise-grade requirements tests",
+    "security: marks security-related tests",
+    "audit: marks audit-logging tests",
+    "e2e: marks end-to-end tests",
+    "conformance: marks protocol conformance tests",
+    "sdk: marks SDK client tests",
+    "stress: marks stress testing scenarios",
+    "schema: marks schema-validation tests",
+    "circuit_breaker: marks circuit breaker tests",
+    "rate_limit: marks rate limiting tests",
+]
+asyncio_mode = "auto"
+timeout = 300
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = [
+    "backend",
+]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/conftest.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/env/*",
+    "*/migrations/*",
+    "*/main.py",
+    # KRITISCHE MODULE ENTFERNT - MÜSSEN GETESTET WERDEN:
+    # "*/agents/*",           # ENTFERNT: Agent-System ist kritisch
+    # "*/voice/*",            # ENTFERNT: Voice-Funktionalität ist kritisch
+    # "*/voice_performance/*", # ENTFERNT: Performance-SLAs müssen validiert werden
+    # "*/voice_rate_limiting/*", # ENTFERNT: Rate Limiting ist kritisch
+    # "*/storage/cache/redis_cache.py", # ENTFERNT: Cache-Logic ist kritisch
+    # "*/observability/*",    # ENTFERNT: Monitoring ist kritisch
+
+    # Nur echte Utility/Infrastructure-Dateien ausschließen:
+    "*/websocket/*",  # WebSocket-Infrastruktur (wird in Integration Tests getestet)
+    "*/api/middleware/websocket_middleware.py",  # WebSocket-Middleware (Integration Tests)
+    "*/api/routes/voice_routes.py",  # Voice Routes (E2E Tests)
+    "*/services/pools/*",  # Connection Pools (Infrastructure)
+    "*/observability/tracing.py",  # Tracing-Setup (Infrastructure)
+    "*/monitoring/azure_monitoring.py",  # Azure-spezifisches Monitoring
+    "*/monitoring/__init__.py",  # Init-Dateien
+    "*/data_models/core/core.py",  # Core Data Models (Schema-only)
+]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+include = [
+    "api/*",
+    "api/v1/*",
+    "services/clients/*",
+    "storage/*",
+    "monitoring/health_checks.py",
+    "config/*",
+    "data_models/*",
+    "kei_logging/*",
+]
+omit = [
+    "*/main.py",
+    "*/agents/*",
+    "*/websocket/*",
+    "*/api/middleware/websocket_middleware.py",
+    "*/api/routes/voice_routes.py",
+    "*/voice/*",
+    "*/services/pools/*",
+    "*/observability/tracing.py",
+    "*/monitoring/azure_monitoring.py",
+    "*/monitoring/__init__.py",
+    "*/storage/cache/redis_cache.py",
+    "*/data_models/core/core.py",
+    "*/tests/*",
+    "*/test_*",
+    "*/conftest.py",
+]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py312",
+]
+include = "\\.pyi?$"
+extend-exclude = "/(\n  # directories\n  \\.eggs\n  | \\.git\n  | \\.hg\n  | \\.mypy_cache\n  | \\.tox\n  | \\.venv\n  | _build\n  | buck-out\n  | build\n  | dist\n  | migrations\n)/\n"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.0.0"
+tag_format = "v$version"
+version_files = [
+    "backend/pyproject.toml:version",
+    "backend/__init__.py:__version__",
+]
+
+[tool.hatch.version]
+path = "backend/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "backend",
+]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+    "- coverage combine",
+    "coverage report",
+]
+cov = [
+    "test-cov",
+    "cov-report",
+]
+lint = [
+    "ruff check .",
+    "black --check .",
+    "mypy .",
+]
+format = [
+    "black .",
+    "ruff --fix .",
+]
+security = "bandit -r backend"
+
+[tool.opentelemetry]
+service_name = "keiko-backend"
+service_version = "1.0.0"
+exporter_otlp_endpoint = "http://localhost:4317"
+exporter_otlp_protocol = "grpc"
+resource_attributes = "service.name=keiko-backend,service.version=1.0.0"
+
+[tool.development.env]
+OTEL_SERVICE_NAME = "keiko-backend"
+OTEL_SERVICE_VERSION = "1.0.0"
+OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317"
+OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
+OTEL_ENABLE_TRACING = "true"
+OTEL_ENABLE_METRICS = "true"
+OTEL_TRACE_SAMPLE_RATE = "1.0"
+OTEL_DEBUG = "true"
+ENVIRONMENT = "development"
+
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+    "test_*",
+    "*_test.py",
+]
+skips = [
+    "B101",
+    "B601",
+    "B602",
+]
+severity = "medium"
+confidence = "medium"
+
+[tool.bandit.assert_used]
+skips = [
+    "**/tests/**",
+    "**/*test*.py",
+]
+
+[dependency-groups]
+dev = [
+    "freezegun>=1.5.5",
+    "mkdocs-git-authors-plugin>=0.10.0",
+    "neoteroi-mkdocs>=1.1.3",
+    "openapi-spec-validator>=0.7.2",
+    "pact-python>=2.3.3",
+    "pytest-benchmark>=5.1.0",
+    "pytest-httpx>=0.35.0",
+    "syrupy>=4.9.1",
+]
+
+# Logfire-Konfiguration - unterdrückt Warnungen in Development
+[tool.logfire]
+ignore_no_config = true

@@ -1,0 +1,315 @@
+# Edge Computing Alert Rules Configuration
+# Definiert Alerting-Regeln für Edge-Infrastructure
+
+# =============================================================================
+# Alert Rules Configuration
+# =============================================================================
+
+# Global Alert Settings
+global:
+  evaluation_interval: 30s
+  resolve_timeout: 5m
+  
+# =============================================================================
+# Edge Node Performance Alerts
+# =============================================================================
+groups:
+  - name: "edge-node-performance"
+    interval: 30s
+    rules:
+      - alert: "EdgeNodeHighLatency"
+        expr: "edge_node_latency_seconds > 0.1"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "performance"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat hohe Latenz"
+          description: "Edge-Node {{ $labels.node_id }} hat eine Latenz von {{ $value }}s (>100ms) für mehr als 5 Minuten."
+          
+      - alert: "EdgeNodeCriticalLatency"
+        expr: "edge_node_latency_seconds > 0.2"
+        for: 2m
+        labels:
+          severity: "critical"
+          component: "edge-node"
+          type: "performance"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat kritische Latenz"
+          description: "Edge-Node {{ $labels.node_id }} hat eine kritische Latenz von {{ $value }}s (>200ms) für mehr als 2 Minuten."
+          
+      - alert: "EdgeNodeSlowTaskProcessing"
+        expr: "edge_task_duration_seconds > 0.5"
+        for: 10m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "performance"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} verarbeitet Tasks langsam"
+          description: "Edge-Node {{ $labels.node_id }} benötigt {{ $value }}s für Task-Verarbeitung (>500ms)."
+
+# =============================================================================
+# Edge Node Resource Alerts
+# =============================================================================
+  - name: "edge-node-resources"
+    interval: 30s
+    rules:
+      - alert: "EdgeNodeHighCPU"
+        expr: "edge_node_cpu_usage > 80"
+        for: 10m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "resource"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat hohe CPU-Auslastung"
+          description: "Edge-Node {{ $labels.node_id }} hat eine CPU-Auslastung von {{ $value }}% (>80%) für mehr als 10 Minuten."
+          
+      - alert: "EdgeNodeCriticalCPU"
+        expr: "edge_node_cpu_usage > 95"
+        for: 5m
+        labels:
+          severity: "critical"
+          component: "edge-node"
+          type: "resource"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat kritische CPU-Auslastung"
+          description: "Edge-Node {{ $labels.node_id }} hat eine kritische CPU-Auslastung von {{ $value }}% (>95%)."
+          
+      - alert: "EdgeNodeHighMemory"
+        expr: "edge_node_memory_usage > 85"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "resource"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat hohe Memory-Auslastung"
+          description: "Edge-Node {{ $labels.node_id }} hat eine Memory-Auslastung von {{ $value }}% (>85%)."
+          
+      - alert: "EdgeNodeHighDisk"
+        expr: "edge_node_disk_usage > 90"
+        for: 15m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "resource"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} hat hohe Disk-Auslastung"
+          description: "Edge-Node {{ $labels.node_id }} hat eine Disk-Auslastung von {{ $value }}% (>90%)."
+
+# =============================================================================
+# Edge Node Availability Alerts
+# =============================================================================
+  - name: "edge-node-availability"
+    interval: 30s
+    rules:
+      - alert: "EdgeNodeDown"
+        expr: "up{job=\"edge-node\"} == 0"
+        for: 1m
+        labels:
+          severity: "critical"
+          component: "edge-node"
+          type: "availability"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} ist offline"
+          description: "Edge-Node {{ $labels.node_id }} ist seit mehr als 1 Minute nicht erreichbar."
+          
+      - alert: "EdgeNodeUnhealthy"
+        expr: "edge_node_health_status == 0"
+        for: 2m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "availability"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} ist ungesund"
+          description: "Edge-Node {{ $labels.node_id }} meldet ungesunden Status seit mehr als 2 Minuten."
+          
+      - alert: "EdgeNodeFlapping"
+        expr: "changes(up{job=\"edge-node\"}[10m]) > 5"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-node"
+          type: "availability"
+        annotations:
+          summary: "Edge-Node {{ $labels.node_id }} ist instabil"
+          description: "Edge-Node {{ $labels.node_id }} wechselt häufig zwischen online/offline ({{ $value }} Änderungen in 10 Minuten)."
+
+# =============================================================================
+# Edge System Alerts
+# =============================================================================
+  - name: "edge-system"
+    interval: 30s
+    rules:
+      - alert: "EdgeSystemHighErrorRate"
+        expr: "rate(edge_errors_total[5m]) / rate(edge_requests_total[5m]) > 0.05"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-system"
+          type: "reliability"
+        annotations:
+          summary: "Edge-System hat hohe Fehlerrate"
+          description: "Edge-System hat eine Fehlerrate von {{ $value | humanizePercentage }} (>5%) in den letzten 5 Minuten."
+          
+      - alert: "EdgeSystemCriticalErrorRate"
+        expr: "rate(edge_errors_total[5m]) / rate(edge_requests_total[5m]) > 0.1"
+        for: 2m
+        labels:
+          severity: "critical"
+          component: "edge-system"
+          type: "reliability"
+        annotations:
+          summary: "Edge-System hat kritische Fehlerrate"
+          description: "Edge-System hat eine kritische Fehlerrate von {{ $value | humanizePercentage }} (>10%)."
+          
+      - alert: "EdgeSystemLowThroughput"
+        expr: "rate(edge_requests_total[5m]) < 10"
+        for: 10m
+        labels:
+          severity: "warning"
+          component: "edge-system"
+          type: "performance"
+        annotations:
+          summary: "Edge-System hat niedrigen Durchsatz"
+          description: "Edge-System verarbeitet nur {{ $value }} Requests/Sekunde (<10 req/s) in den letzten 5 Minuten."
+
+# =============================================================================
+# Edge Cache Alerts
+# =============================================================================
+  - name: "edge-cache"
+    interval: 60s
+    rules:
+      - alert: "EdgeCacheLowHitRate"
+        expr: "edge_cache_hit_rate < 0.7"
+        for: 15m
+        labels:
+          severity: "warning"
+          component: "edge-cache"
+          type: "performance"
+        annotations:
+          summary: "Edge-Cache hat niedrige Hit-Rate"
+          description: "Edge-Cache hat eine Hit-Rate von {{ $value | humanizePercentage }} (<70%) für mehr als 15 Minuten."
+          
+      - alert: "EdgeCacheHighEvictionRate"
+        expr: "rate(edge_cache_evictions_total[5m]) > 10"
+        for: 10m
+        labels:
+          severity: "warning"
+          component: "edge-cache"
+          type: "performance"
+        annotations:
+          summary: "Edge-Cache hat hohe Eviction-Rate"
+          description: "Edge-Cache evicted {{ $value }} Einträge/Sekunde (>10/s) in den letzten 5 Minuten."
+
+# =============================================================================
+# Edge Load Balancer Alerts
+# =============================================================================
+  - name: "edge-load-balancer"
+    interval: 30s
+    rules:
+      - alert: "EdgeLoadBalancerDown"
+        expr: "up{job=\"edge-load-balancer\"} == 0"
+        for: 1m
+        labels:
+          severity: "critical"
+          component: "edge-load-balancer"
+          type: "availability"
+        annotations:
+          summary: "Edge Load Balancer ist offline"
+          description: "Edge Load Balancer ist seit mehr als 1 Minute nicht erreichbar."
+          
+      - alert: "EdgeLoadBalancerHighLatency"
+        expr: "edge_load_balancer_latency_seconds > 0.05"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-load-balancer"
+          type: "performance"
+        annotations:
+          summary: "Edge Load Balancer hat hohe Latenz"
+          description: "Edge Load Balancer hat eine Latenz von {{ $value }}s (>50ms) für mehr als 5 Minuten."
+          
+      - alert: "EdgeLoadBalancerNoHealthyNodes"
+        expr: "edge_healthy_nodes_count == 0"
+        for: 1m
+        labels:
+          severity: "critical"
+          component: "edge-load-balancer"
+          type: "availability"
+        annotations:
+          summary: "Keine gesunden Edge-Nodes verfügbar"
+          description: "Edge Load Balancer hat keine gesunden Nodes für Routing verfügbar."
+
+# =============================================================================
+# Edge Registry Alerts
+# =============================================================================
+  - name: "edge-registry"
+    interval: 30s
+    rules:
+      - alert: "EdgeRegistryDown"
+        expr: "up{job=\"edge-registry\"} == 0"
+        for: 1m
+        labels:
+          severity: "critical"
+          component: "edge-registry"
+          type: "availability"
+        annotations:
+          summary: "Edge Registry ist offline"
+          description: "Edge Registry ist seit mehr als 1 Minute nicht erreichbar."
+          
+      - alert: "EdgeRegistryHighRegistrationFailures"
+        expr: "rate(edge_registry_registration_failures_total[5m]) > 1"
+        for: 5m
+        labels:
+          severity: "warning"
+          component: "edge-registry"
+          type: "reliability"
+        annotations:
+          summary: "Edge Registry hat hohe Registrierungsfehler"
+          description: "Edge Registry hat {{ $value }} Registrierungsfehler/Sekunde (>1/s) in den letzten 5 Minuten."
+
+# =============================================================================
+# Alert Routing Rules
+# =============================================================================
+route:
+  group_by: ['alertname', 'severity', 'component']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 30m
+      
+    - match:
+        component: edge-node
+      receiver: 'edge-node-alerts'
+      
+    - match:
+        component: edge-system
+      receiver: 'edge-system-alerts'
+
+# =============================================================================
+# Alert Receivers
+# =============================================================================
+receivers:
+  - name: 'default'
+    # Default receiver (console logging)
+    
+  - name: 'critical-alerts'
+    # Critical alerts receiver
+    
+  - name: 'edge-node-alerts'
+    # Edge node specific alerts
+    
+  - name: 'edge-system-alerts'
+    # Edge system alerts

@@ -1,0 +1,76 @@
+# OpenTelemetry Collector Configuration – Production-grade PII-Redaction
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    limit_mib: 256
+    check_interval: 1s
+
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  # 1) Delete/Hash für klar identifizierbare Felder
+  attributes/sanitize:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
+      - key: user.email
+        action: hash
+      - key: api.token
+        action: delete
+
+  # 2) Redaction via OTTL (Maskieren per Regex – ersetzt nicht unterstützte 'mask'-Aktion)
+  transform/redact_pii:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["credit_card"], "****-****-****-****") where attributes["credit_card"] != nil
+
+exporters:
+  # OTLP Export zu Jaeger
+  otlp/jaeger:
+    endpoint: http://jaeger:14250
+    tls:
+      insecure: true
+
+  # Prometheus Exporter für eigene Metriken des Backends
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      service: keiko-backend
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        [memory_limiter, attributes/sanitize, transform/redact_pii, batch]
+      exporters: [otlp/jaeger]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888

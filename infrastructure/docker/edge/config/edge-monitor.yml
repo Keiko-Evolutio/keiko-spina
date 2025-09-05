@@ -1,0 +1,338 @@
+# Edge Performance Monitor Configuration - Development
+# Konfiguration für Performance-Monitoring und Alerting
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  name: "edge-monitor"
+  version: "1.0.0"
+  environment: "development"
+  
+# =============================================================================
+# Server Configuration
+# =============================================================================
+server:
+  host: "0.0.0.0"
+  port: 8090
+  health_port: 8091
+  metrics_port: 9091
+  workers: 2
+  max_connections: 200
+  keepalive_timeout: 65
+  request_timeout: 30
+
+# =============================================================================
+# Registry Configuration
+# =============================================================================
+registry:
+  url: "${REGISTRY_URL}"
+  sync_interval_seconds: 30
+  timeout_seconds: 10
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+monitoring:
+  # Data Collection
+  data_collection:
+    enabled: true
+    collection_interval_seconds: "${EDGE_METRICS_INTERVAL:-10}"
+    retention_hours: 24
+    
+    # Metrics to Collect
+    metrics:
+      - "node_latency"
+      - "node_cpu_usage"
+      - "node_memory_usage"
+      - "node_disk_usage"
+      - "task_duration"
+      - "task_throughput"
+      - "cache_hit_rate"
+      - "error_rate"
+      - "request_rate"
+      - "connection_count"
+      
+  # Performance Thresholds
+  thresholds:
+    latency_ms: "${EDGE_LATENCY_THRESHOLD_MS:-100}"
+    cpu_percent: "${EDGE_CPU_THRESHOLD_PERCENT:-80}"
+    memory_percent: "${EDGE_MEMORY_THRESHOLD_PERCENT:-85}"
+    disk_percent: 90
+    error_rate: 0.05
+    cache_hit_rate_min: 0.7
+    
+  # Health Checks
+  health_checks:
+    enabled: true
+    check_interval_seconds: 30
+    timeout_seconds: 10
+    max_failures: 3
+
+# =============================================================================
+# Alerting Configuration
+# =============================================================================
+alerting:
+  enabled: true
+  evaluation_interval_seconds: "${EDGE_ALERT_EVALUATION_INTERVAL:-30}"
+  
+  # Alert Channels
+  channels:
+    console:
+      enabled: true
+      level: "warning"
+    file:
+      enabled: true
+      path: "/app/logs/alerts.log"
+      level: "warning"
+    webhook:
+      enabled: false  # Disabled for development
+      url: "${ALERT_WEBHOOK_URL:-}"
+      
+  # Alert Rules
+  rules:
+    - name: "high_node_latency"
+      description: "Edge-Node-Latenz zu hoch"
+      condition: "avg_latency_ms > 100"
+      severity: "warning"
+      duration: "5m"
+      labels:
+        component: "edge-node"
+        type: "performance"
+        
+    - name: "critical_node_latency"
+      description: "Edge-Node-Latenz kritisch hoch"
+      condition: "avg_latency_ms > 200"
+      severity: "critical"
+      duration: "2m"
+      labels:
+        component: "edge-node"
+        type: "performance"
+        
+    - name: "high_cpu_usage"
+      description: "Hohe CPU-Auslastung"
+      condition: "cpu_percent > 80"
+      severity: "warning"
+      duration: "10m"
+      labels:
+        component: "edge-node"
+        type: "resource"
+        
+    - name: "high_memory_usage"
+      description: "Hohe Memory-Auslastung"
+      condition: "memory_percent > 85"
+      severity: "warning"
+      duration: "5m"
+      labels:
+        component: "edge-node"
+        type: "resource"
+        
+    - name: "node_offline"
+      description: "Edge-Node offline"
+      condition: "node_status == 'offline'"
+      severity: "critical"
+      duration: "1m"
+      labels:
+        component: "edge-node"
+        type: "availability"
+        
+    - name: "high_error_rate"
+      description: "Hohe Fehlerrate"
+      condition: "error_rate > 0.05"
+      severity: "warning"
+      duration: "5m"
+      labels:
+        component: "edge-system"
+        type: "reliability"
+        
+    - name: "low_cache_hit_rate"
+      description: "Niedrige Cache-Hit-Rate"
+      condition: "cache_hit_rate < 0.7"
+      severity: "warning"
+      duration: "15m"
+      labels:
+        component: "edge-cache"
+        type: "performance"
+
+# =============================================================================
+# Prometheus Integration
+# =============================================================================
+prometheus:
+  enabled: true
+  url: "${PROMETHEUS_URL:-http://prometheus:9090}"
+  scrape_interval_seconds: 15
+  
+  # Metrics Export
+  metrics_export:
+    enabled: true
+    port: 9091
+    path: "/metrics"
+    
+  # Custom Metrics
+  custom_metrics:
+    - name: "edge_node_count"
+      type: "gauge"
+      description: "Anzahl der Edge-Nodes"
+      
+    - name: "edge_node_latency_seconds"
+      type: "histogram"
+      description: "Edge-Node-Latenz"
+      buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+      
+    - name: "edge_task_duration_seconds"
+      type: "histogram"
+      description: "Task-Verarbeitungszeit"
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+      
+    - name: "edge_cache_hit_rate"
+      type: "gauge"
+      description: "Cache-Hit-Rate"
+      
+    - name: "edge_requests_total"
+      type: "counter"
+      description: "Gesamt-Requests"
+      
+    - name: "edge_errors_total"
+      type: "counter"
+      description: "Gesamt-Fehler"
+
+# =============================================================================
+# Grafana Integration
+# =============================================================================
+grafana:
+  enabled: false  # Disabled for development
+  url: "${GRAFANA_URL:-http://grafana:3000}"
+  api_key: "${GRAFANA_API_KEY:-}"
+  
+  # Dashboard Management
+  dashboards:
+    auto_import: false
+    dashboard_path: "/app/dashboards"
+
+# =============================================================================
+# Alertmanager Integration
+# =============================================================================
+alertmanager:
+  enabled: false  # Disabled for development
+  url: "${ALERTMANAGER_URL:-http://alertmanager:9093}"
+  
+  # Alert Routing
+  routing:
+    group_by: ["alertname", "severity"]
+    group_wait: "10s"
+    group_interval: "10s"
+    repeat_interval: "1h"
+
+# =============================================================================
+# Data Storage
+# =============================================================================
+storage:
+  # Time Series Database
+  timeseries:
+    enabled: true
+    backend: "memory"  # memory, file, prometheus
+    retention_hours: 24
+    
+  # Metrics Storage
+  metrics_storage:
+    enabled: true
+    path: "/app/data/metrics"
+    max_size_mb: 1000
+    
+  # Alert History
+  alert_history:
+    enabled: true
+    path: "/app/data/alerts"
+    retention_days: 7
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+api:
+  # Versioning
+  version: "v1"
+  base_path: "/api/v1"
+  
+  # Endpoints
+  endpoints:
+    metrics: "/metrics"
+    alerts: "/alerts"
+    health: "/health"
+    nodes: "/nodes"
+    
+  # CORS
+  cors:
+    enabled: true
+    allowed_origins: ["*"]  # Permissive for development
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Authentication
+  authentication:
+    enabled: false  # Disabled for development
+    api_key_required: false
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 500
+    burst_size: 50
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "DEBUG"
+  format: "json"
+  
+  # Log Destinations
+  destinations:
+    console:
+      enabled: true
+      level: "DEBUG"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "/app/logs/edge-monitor.log"
+      max_size_mb: 50
+      backup_count: 3
+      
+  # Performance Logging
+  performance:
+    enabled: true
+    log_slow_queries: true
+    slow_query_threshold_ms: 100
+
+# =============================================================================
+# Development Configuration
+# =============================================================================
+development:
+  # Debug Features
+  debug:
+    enabled: true
+    detailed_errors: true
+    include_stack_traces: true
+    
+  # Mock Data
+  mock_data:
+    enabled: true
+    generate_test_metrics: true
+    simulate_alerts: false
+    
+  # Development Tools
+  tools:
+    auto_reload: true
+    debug_endpoints: true
+    metrics_explorer: true
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+features:
+  advanced_analytics: false  # Disabled for development
+  machine_learning_anomaly_detection: false
+  predictive_alerting: false
+  automated_remediation: false
+  real_time_dashboards: true

@@ -1,0 +1,28 @@
+{
+  "id": null,
+  "title": "Keiko API Performance",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "editable": true,
+  "tags": ["keiko", "api"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "P95 Latency (s)",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate (5xx / total)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "rate(http_requests_total{status=~\\"5..\\"}[5m]) / rate(http_requests_total[5m])", "refId": "A"}
+      ]
+    }
+  ]
+}

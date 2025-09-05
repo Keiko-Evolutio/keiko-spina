@@ -1,0 +1,405 @@
+syntax = "proto3";
+
+package keiko.platform.events.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/keiko-dev-team/keiko-personal-assistant/api/platform/events/v1";
+option java_package = "dev.keiko.platform.events.v1";
+option java_multiple_files = true;
+option csharp_namespace = "Keiko.Platform.Events.V1";
+
+// ============================================================================
+// PLATFORM-INTERNE EVENT DEFINITIONS
+// Diese .proto Datei definiert Events die NUR Platform-intern verwendet werden.
+// SDK hat KEINE Abhängigkeit zu diesen Definitionen.
+// ============================================================================
+
+// Platform Event Service für interne gRPC-Kommunikation
+service PlatformEventService {
+  // Platform-interne Event-Publikation
+  rpc PublishPlatformEvent(PublishPlatformEventRequest) returns (PublishPlatformEventResponse);
+  
+  // Platform-interne Event-Subscription
+  rpc SubscribePlatformEvents(SubscribePlatformEventsRequest) returns (stream PlatformEventMessage);
+  
+  // Platform-interne Event-History
+  rpc GetPlatformEventHistory(GetPlatformEventHistoryRequest) returns (GetPlatformEventHistoryResponse);
+}
+
+// Base Platform Event Message
+message PlatformEventMessage {
+  // Event Metadata
+  string event_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string source_service = 4;
+  string correlation_id = 5;
+  
+  // Event Payload (one of the specific event types)
+  oneof payload {
+    PlatformAgentEvent agent_event = 10;
+    PlatformTaskEvent task_event = 11;
+    PlatformWorkflowEvent workflow_event = 12;
+    PlatformSystemEvent system_event = 13;
+  }
+  
+  // Platform-interne Metadaten
+  PlatformEventMetadata platform_metadata = 20;
+}
+
+// Platform-spezifische Event-Metadaten
+message PlatformEventMetadata {
+  string nats_subject = 1;
+  string nats_stream = 2;
+  uint64 nats_sequence = 3;
+  string processing_node = 4;
+  google.protobuf.Struct internal_context = 5;
+}
+
+// ============================================================================
+// PLATFORM AGENT EVENTS (Platform-intern)
+// ============================================================================
+
+message PlatformAgentEvent {
+  string agent_id = 1;
+  PlatformAgentEventType event_type = 2;
+  
+  oneof event_data {
+    PlatformAgentCreatedData created = 10;
+    PlatformAgentUpdatedData updated = 11;
+    PlatformAgentStatusChangedData status_changed = 12;
+    PlatformAgentDeletedData deleted = 13;
+    PlatformAgentHealthCheckData health_check = 14;
+  }
+}
+
+enum PlatformAgentEventType {
+  PLATFORM_AGENT_EVENT_TYPE_UNSPECIFIED = 0;
+  PLATFORM_AGENT_EVENT_TYPE_CREATED = 1;
+  PLATFORM_AGENT_EVENT_TYPE_UPDATED = 2;
+  PLATFORM_AGENT_EVENT_TYPE_STATUS_CHANGED = 3;
+  PLATFORM_AGENT_EVENT_TYPE_DELETED = 4;
+  PLATFORM_AGENT_EVENT_TYPE_HEALTH_CHECK = 5;
+}
+
+message PlatformAgentCreatedData {
+  string agent_type = 1;
+  repeated string capabilities = 2;
+  google.protobuf.Struct configuration = 3;
+  string created_by_service = 4;
+  PlatformAgentInternalState internal_state = 5;
+}
+
+message PlatformAgentUpdatedData {
+  repeated string capabilities = 1;
+  google.protobuf.Struct configuration = 2;
+  string updated_by_service = 3;
+  PlatformAgentInternalState internal_state = 4;
+}
+
+message PlatformAgentStatusChangedData {
+  PlatformAgentStatus previous_status = 1;
+  PlatformAgentStatus new_status = 2;
+  string reason = 3;
+  google.protobuf.Timestamp status_changed_at = 4;
+}
+
+message PlatformAgentDeletedData {
+  string reason = 1;
+  string deleted_by_service = 2;
+  bool cleanup_completed = 3;
+}
+
+message PlatformAgentHealthCheckData {
+  PlatformAgentStatus status = 1;
+  google.protobuf.Struct metrics = 2;
+  repeated string warnings = 3;
+  repeated string errors = 4;
+}
+
+enum PlatformAgentStatus {
+  PLATFORM_AGENT_STATUS_UNSPECIFIED = 0;
+  PLATFORM_AGENT_STATUS_INITIALIZING = 1;
+  PLATFORM_AGENT_STATUS_ACTIVE = 2;
+  PLATFORM_AGENT_STATUS_INACTIVE = 3;
+  PLATFORM_AGENT_STATUS_ERROR = 4;
+  PLATFORM_AGENT_STATUS_MAINTENANCE = 5;
+  PLATFORM_AGENT_STATUS_TERMINATING = 6;
+}
+
+message PlatformAgentInternalState {
+  string node_id = 1;
+  string process_id = 2;
+  google.protobuf.Struct resource_usage = 3;
+  repeated string active_connections = 4;
+}
+
+// ============================================================================
+// PLATFORM TASK EVENTS (Platform-intern)
+// ============================================================================
+
+message PlatformTaskEvent {
+  string task_id = 1;
+  PlatformTaskEventType event_type = 2;
+  
+  oneof event_data {
+    PlatformTaskCreatedData created = 10;
+    PlatformTaskAssignedData assigned = 11;
+    PlatformTaskStartedData started = 12;
+    PlatformTaskCompletedData completed = 13;
+    PlatformTaskFailedData failed = 14;
+    PlatformTaskCancelledData cancelled = 15;
+  }
+}
+
+enum PlatformTaskEventType {
+  PLATFORM_TASK_EVENT_TYPE_UNSPECIFIED = 0;
+  PLATFORM_TASK_EVENT_TYPE_CREATED = 1;
+  PLATFORM_TASK_EVENT_TYPE_ASSIGNED = 2;
+  PLATFORM_TASK_EVENT_TYPE_STARTED = 3;
+  PLATFORM_TASK_EVENT_TYPE_COMPLETED = 4;
+  PLATFORM_TASK_EVENT_TYPE_FAILED = 5;
+  PLATFORM_TASK_EVENT_TYPE_CANCELLED = 6;
+}
+
+message PlatformTaskCreatedData {
+  string task_type = 1;
+  PlatformTaskPriority priority = 2;
+  google.protobuf.Struct task_data = 3;
+  string created_by_service = 4;
+  google.protobuf.Timestamp deadline = 5;
+}
+
+message PlatformTaskAssignedData {
+  string agent_id = 1;
+  string assigned_by_service = 2;
+  google.protobuf.Timestamp assigned_at = 3;
+  PlatformTaskAssignmentStrategy strategy = 4;
+}
+
+message PlatformTaskStartedData {
+  string agent_id = 1;
+  google.protobuf.Timestamp started_at = 2;
+  string execution_node = 3;
+}
+
+message PlatformTaskCompletedData {
+  string agent_id = 1;
+  google.protobuf.Timestamp completed_at = 2;
+  google.protobuf.Any result = 3;
+  int64 execution_time_ms = 4;
+}
+
+message PlatformTaskFailedData {
+  string agent_id = 1;
+  google.protobuf.Timestamp failed_at = 2;
+  string error_message = 3;
+  string error_code = 4;
+  int32 retry_count = 5;
+  bool will_retry = 6;
+}
+
+message PlatformTaskCancelledData {
+  string cancelled_by_service = 1;
+  google.protobuf.Timestamp cancelled_at = 2;
+  string reason = 3;
+}
+
+enum PlatformTaskPriority {
+  PLATFORM_TASK_PRIORITY_UNSPECIFIED = 0;
+  PLATFORM_TASK_PRIORITY_LOW = 1;
+  PLATFORM_TASK_PRIORITY_MEDIUM = 2;
+  PLATFORM_TASK_PRIORITY_HIGH = 3;
+  PLATFORM_TASK_PRIORITY_CRITICAL = 4;
+}
+
+enum PlatformTaskAssignmentStrategy {
+  PLATFORM_TASK_ASSIGNMENT_STRATEGY_UNSPECIFIED = 0;
+  PLATFORM_TASK_ASSIGNMENT_STRATEGY_ROUND_ROBIN = 1;
+  PLATFORM_TASK_ASSIGNMENT_STRATEGY_LOAD_BALANCED = 2;
+  PLATFORM_TASK_ASSIGNMENT_STRATEGY_CAPABILITY_BASED = 3;
+  PLATFORM_TASK_ASSIGNMENT_STRATEGY_MANUAL = 4;
+}
+
+// ============================================================================
+// PLATFORM WORKFLOW EVENTS (Platform-intern)
+// ============================================================================
+
+message PlatformWorkflowEvent {
+  string workflow_id = 1;
+  string plan_id = 2;
+  PlatformWorkflowEventType event_type = 3;
+  
+  oneof event_data {
+    PlatformWorkflowStartedData started = 10;
+    PlatformWorkflowStepCompletedData step_completed = 11;
+    PlatformWorkflowCompletedData completed = 12;
+    PlatformWorkflowFailedData failed = 13;
+    PlatformWorkflowCancelledData cancelled = 14;
+  }
+}
+
+enum PlatformWorkflowEventType {
+  PLATFORM_WORKFLOW_EVENT_TYPE_UNSPECIFIED = 0;
+  PLATFORM_WORKFLOW_EVENT_TYPE_STARTED = 1;
+  PLATFORM_WORKFLOW_EVENT_TYPE_STEP_COMPLETED = 2;
+  PLATFORM_WORKFLOW_EVENT_TYPE_COMPLETED = 3;
+  PLATFORM_WORKFLOW_EVENT_TYPE_FAILED = 4;
+  PLATFORM_WORKFLOW_EVENT_TYPE_CANCELLED = 5;
+}
+
+message PlatformWorkflowStartedData {
+  string started_by_service = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Struct workflow_context = 3;
+  repeated string planned_steps = 4;
+}
+
+message PlatformWorkflowStepCompletedData {
+  string step_id = 1;
+  string step_name = 2;
+  google.protobuf.Timestamp completed_at = 3;
+  google.protobuf.Any step_result = 4;
+  string next_step_id = 5;
+}
+
+message PlatformWorkflowCompletedData {
+  google.protobuf.Timestamp completed_at = 1;
+  PlatformWorkflowStatus final_status = 2;
+  google.protobuf.Any final_result = 3;
+  int64 total_execution_time_ms = 4;
+  int32 total_steps_executed = 5;
+}
+
+message PlatformWorkflowFailedData {
+  google.protobuf.Timestamp failed_at = 1;
+  string failed_step_id = 2;
+  string error_message = 3;
+  string error_code = 4;
+  google.protobuf.Struct error_context = 5;
+}
+
+message PlatformWorkflowCancelledData {
+  string cancelled_by_service = 1;
+  google.protobuf.Timestamp cancelled_at = 2;
+  string reason = 3;
+  string current_step_id = 4;
+}
+
+enum PlatformWorkflowStatus {
+  PLATFORM_WORKFLOW_STATUS_UNSPECIFIED = 0;
+  PLATFORM_WORKFLOW_STATUS_RUNNING = 1;
+  PLATFORM_WORKFLOW_STATUS_COMPLETED = 2;
+  PLATFORM_WORKFLOW_STATUS_FAILED = 3;
+  PLATFORM_WORKFLOW_STATUS_CANCELLED = 4;
+}
+
+// ============================================================================
+// PLATFORM SYSTEM EVENTS (Platform-intern)
+// ============================================================================
+
+message PlatformSystemEvent {
+  PlatformSystemEventType event_type = 1;
+  string component = 2;
+  
+  oneof event_data {
+    PlatformSystemHealthData health = 10;
+    PlatformSystemMaintenanceData maintenance = 11;
+    PlatformSystemScalingData scaling = 12;
+    PlatformSystemErrorData error = 13;
+  }
+}
+
+enum PlatformSystemEventType {
+  PLATFORM_SYSTEM_EVENT_TYPE_UNSPECIFIED = 0;
+  PLATFORM_SYSTEM_EVENT_TYPE_HEALTH_CHECK = 1;
+  PLATFORM_SYSTEM_EVENT_TYPE_MAINTENANCE_START = 2;
+  PLATFORM_SYSTEM_EVENT_TYPE_MAINTENANCE_END = 3;
+  PLATFORM_SYSTEM_EVENT_TYPE_SCALING_EVENT = 4;
+  PLATFORM_SYSTEM_EVENT_TYPE_ERROR = 5;
+}
+
+message PlatformSystemHealthData {
+  PlatformSystemHealthStatus status = 1;
+  google.protobuf.Struct metrics = 2;
+  repeated string warnings = 3;
+  repeated string errors = 4;
+  google.protobuf.Timestamp last_check = 5;
+}
+
+message PlatformSystemMaintenanceData {
+  bool maintenance_active = 1;
+  google.protobuf.Timestamp scheduled_start = 2;
+  google.protobuf.Timestamp scheduled_end = 3;
+  string reason = 4;
+  repeated string affected_services = 5;
+}
+
+message PlatformSystemScalingData {
+  string scaling_action = 1; // "scale_up", "scale_down", "scale_out", "scale_in"
+  int32 previous_instances = 2;
+  int32 new_instances = 3;
+  string trigger_reason = 4;
+}
+
+message PlatformSystemErrorData {
+  string error_code = 1;
+  string error_message = 2;
+  string stack_trace = 3;
+  google.protobuf.Struct error_context = 4;
+  string severity = 5; // "low", "medium", "high", "critical"
+}
+
+enum PlatformSystemHealthStatus {
+  PLATFORM_SYSTEM_HEALTH_STATUS_UNSPECIFIED = 0;
+  PLATFORM_SYSTEM_HEALTH_STATUS_HEALTHY = 1;
+  PLATFORM_SYSTEM_HEALTH_STATUS_DEGRADED = 2;
+  PLATFORM_SYSTEM_HEALTH_STATUS_UNHEALTHY = 3;
+}
+
+// ============================================================================
+// SERVICE REQUEST/RESPONSE MESSAGES
+// ============================================================================
+
+message PublishPlatformEventRequest {
+  PlatformEventMessage event = 1;
+  bool wait_for_confirmation = 2;
+  int32 timeout_seconds = 3;
+}
+
+message PublishPlatformEventResponse {
+  string event_id = 1;
+  bool published = 2;
+  google.protobuf.Timestamp published_at = 3;
+  string nats_subject = 4;
+  uint64 nats_sequence = 5;
+}
+
+message SubscribePlatformEventsRequest {
+  repeated string event_types = 1;
+  repeated string source_services = 2;
+  string consumer_group = 3;
+  bool include_historical = 4;
+  google.protobuf.Timestamp start_time = 5;
+}
+
+message GetPlatformEventHistoryRequest {
+  repeated string event_types = 1;
+  string agent_id = 2;
+  string task_id = 3;
+  string workflow_id = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  string cursor = 8;
+}
+
+message GetPlatformEventHistoryResponse {
+  repeated PlatformEventMessage events = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+  int32 total_count = 4;
+}

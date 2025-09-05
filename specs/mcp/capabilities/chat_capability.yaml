@@ -1,0 +1,576 @@
+# specs/mcp/capabilities/chat_capability.yaml
+# MCP (Model Context Protocol) Profil für Chat-Capability
+
+mcp_version: "1.0.0"
+profile_version: "1.0.0"
+
+capability:
+  name: "chat"
+  display_name: "Chat Capability"
+  description: |
+    Vollständige Chat-Capability für konversationelle KI-Agents.
+    Unterstützt Multi-Turn-Dialoge, Kontext-Management und verschiedene
+    Chat-Modi für unterschiedliche Anwendungsfälle.
+
+  version: "1.0.0"
+  category: "communication"
+  tags: ["chat", "conversation", "nlp", "dialogue"]
+
+  # Capability-Metadaten
+  metadata:
+    author: "KEI-Agent-Framework Team"
+    license: "MIT"
+    documentation_url: "https://docs.Keiko Personal Assistantcom/capabilities/chat"
+    source_url: "https://github.com/kei-agent-framework/capabilities/chat"
+
+  # Unterstützte Sprachen
+  supported_languages:
+    - "de" # Deutsch
+    - "en" # Englisch
+    - "fr" # Französisch
+    - "es" # Spanisch
+    - "it" # Italienisch
+    - "pt" # Portugiesisch
+    - "nl" # Niederländisch
+
+  # Framework-Kompatibilität
+  framework_compatibility:
+    min_version: "1.0.0"
+    max_version: "2.0.0"
+    tested_versions: ["1.0.0", "1.1.0", "1.2.0"]
+
+# Capability-Interface-Definition
+interface:
+  # Primäre Chat-Methoden
+  methods:
+    chat:
+      description: "Führt Chat-Konversation durch"
+      input_schema:
+        type: "object"
+        required: ["message"]
+        properties:
+          message:
+            type: "string"
+            description: "Benutzer-Nachricht"
+            minLength: 1
+            maxLength: 10000
+            example: "Hallo, wie kann ich Ihnen helfen?"
+
+          conversation_id:
+            type: "string"
+            format: "uuid"
+            description: "Eindeutige Konversations-ID für Kontext-Tracking"
+            example: "550e8400-e29b-41d4-a716-446655440000"
+
+          context:
+            type: "object"
+            description: "Zusätzlicher Kontext für die Konversation"
+            properties:
+              user_id:
+                type: "string"
+                description: "Benutzer-ID"
+              session_id:
+                type: "string"
+                description: "Session-ID"
+              language:
+                type: "string"
+                enum: ["de", "en", "fr", "es", "it", "pt", "nl"]
+                default: "de"
+                description: "Bevorzugte Sprache"
+              domain:
+                type: "string"
+                description: "Fachbereich/Domain"
+                example: "customer_support"
+              previous_messages:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+                maxItems: 50
+                description: "Vorherige Nachrichten für Kontext"
+
+          options:
+            type: "object"
+            description: "Chat-Optionen und Konfiguration"
+            properties:
+              max_response_length:
+                type: "integer"
+                minimum: 1
+                maximum: 5000
+                default: 1000
+                description: "Maximale Antwort-Länge"
+
+              temperature:
+                type: "number"
+                minimum: 0.0
+                maximum: 2.0
+                default: 0.7
+                description: "Kreativitäts-Parameter"
+
+              response_format:
+                type: "string"
+                enum: ["text", "markdown", "html"]
+                default: "text"
+                description: "Format der Antwort"
+
+              include_confidence:
+                type: "boolean"
+                default: false
+                description: "Confidence-Score in Antwort einschließen"
+
+              enable_memory:
+                type: "boolean"
+                default: true
+                description: "Konversations-Memory aktivieren"
+
+              safety_level:
+                type: "string"
+                enum: ["low", "medium", "high", "strict"]
+                default: "medium"
+                description: "Sicherheitslevel für Content-Filtering"
+
+      output_schema:
+        type: "object"
+        required: ["response", "conversation_id", "timestamp"]
+        properties:
+          response:
+            type: "string"
+            description: "Agent-Antwort"
+            example: "Gerne helfe ich Ihnen! Was kann ich für Sie tun?"
+
+          conversation_id:
+            type: "string"
+            format: "uuid"
+            description: "Konversations-ID"
+
+          message_id:
+            type: "string"
+            format: "uuid"
+            description: "Eindeutige Nachrichten-ID"
+
+          timestamp:
+            type: "string"
+            format: "date-time"
+            description: "Zeitstempel der Antwort"
+
+          confidence_score:
+            type: "number"
+            minimum: 0.0
+            maximum: 1.0
+            description: "Confidence-Score der Antwort"
+
+          detected_language:
+            type: "string"
+            description: "Erkannte Sprache der Eingabe"
+
+          detected_intent:
+            type: "string"
+            description: "Erkannte Benutzer-Absicht"
+            example: "greeting"
+
+          suggested_actions:
+            type: "array"
+            items:
+              type: "object"
+              properties:
+                action:
+                  type: "string"
+                  description: "Vorgeschlagene Aktion"
+                label:
+                  type: "string"
+                  description: "Anzeige-Label"
+                confidence:
+                  type: "number"
+                  minimum: 0.0
+                  maximum: 1.0
+            description: "Vorgeschlagene Follow-up-Aktionen"
+
+          context_used:
+            type: "object"
+            description: "Verwendeter Kontext für die Antwort"
+            properties:
+              previous_messages_count:
+                type: "integer"
+                description: "Anzahl verwendeter vorheriger Nachrichten"
+              domain_knowledge_used:
+                type: "boolean"
+                description: "Domain-spezifisches Wissen verwendet"
+              external_sources:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Verwendete externe Quellen"
+
+          metadata:
+            type: "object"
+            description: "Zusätzliche Metadaten"
+            properties:
+              processing_time_ms:
+                type: "number"
+                description: "Verarbeitungszeit in Millisekunden"
+              model_version:
+                type: "string"
+                description: "Verwendete Modell-Version"
+              safety_flags:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Ausgelöste Sicherheits-Flags"
+
+      errors:
+        - code: "INVALID_MESSAGE"
+          description: "Ungültige oder leere Nachricht"
+        - code: "CONVERSATION_NOT_FOUND"
+          description: "Konversation nicht gefunden"
+        - code: "LANGUAGE_NOT_SUPPORTED"
+          description: "Sprache nicht unterstützt"
+        - code: "CONTENT_FILTERED"
+          description: "Inhalt durch Sicherheitsfilter blockiert"
+        - code: "RATE_LIMIT_EXCEEDED"
+          description: "Rate-Limit überschritten"
+        - code: "CONTEXT_TOO_LARGE"
+          description: "Kontext zu groß"
+
+    start_conversation:
+      description: "Startet neue Konversation"
+      input_schema:
+        type: "object"
+        properties:
+          user_id:
+            type: "string"
+            description: "Benutzer-ID"
+          session_id:
+            type: "string"
+            description: "Session-ID"
+          initial_context:
+            type: "object"
+            description: "Initialer Kontext"
+          language:
+            type: "string"
+            enum: ["de", "en", "fr", "es", "it", "pt", "nl"]
+            default: "de"
+          domain:
+            type: "string"
+            description: "Fachbereich"
+
+      output_schema:
+        type: "object"
+        required: ["conversation_id", "greeting"]
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+            description: "Neue Konversations-ID"
+          greeting:
+            type: "string"
+            description: "Begrüßungsnachricht"
+          suggested_topics:
+            type: "array"
+            items:
+              type: "string"
+            description: "Vorgeschlagene Gesprächsthemen"
+
+    end_conversation:
+      description: "Beendet Konversation"
+      input_schema:
+        type: "object"
+        required: ["conversation_id"]
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+            description: "Konversations-ID"
+          reason:
+            type: "string"
+            description: "Grund für Beendigung"
+
+      output_schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          farewell_message:
+            type: "string"
+            description: "Abschiedsnachricht"
+          conversation_summary:
+            type: "string"
+            description: "Zusammenfassung der Konversation"
+
+    get_conversation_history:
+      description: "Holt Konversations-Historie"
+      input_schema:
+        type: "object"
+        required: ["conversation_id"]
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          limit:
+            type: "integer"
+            minimum: 1
+            maximum: 100
+            default: 50
+          offset:
+            type: "integer"
+            minimum: 0
+            default: 0
+
+      output_schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          messages:
+            type: "array"
+            items:
+              $ref: "#/components/schemas/ChatMessage"
+          total_count:
+            type: "integer"
+          has_more:
+            type: "boolean"
+
+  # Events die von der Capability emittiert werden
+  events:
+    message_received:
+      description: "Nachricht empfangen"
+      schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          message:
+            type: "string"
+          user_id:
+            type: "string"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+    response_generated:
+      description: "Antwort generiert"
+      schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          response:
+            type: "string"
+          confidence_score:
+            type: "number"
+          processing_time_ms:
+            type: "number"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+    conversation_started:
+      description: "Konversation gestartet"
+      schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          user_id:
+            type: "string"
+          language:
+            type: "string"
+          domain:
+            type: "string"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+    conversation_ended:
+      description: "Konversation beendet"
+      schema:
+        type: "object"
+        properties:
+          conversation_id:
+            type: "string"
+            format: "uuid"
+          duration_seconds:
+            type: "integer"
+          message_count:
+            type: "integer"
+          reason:
+            type: "string"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+# Konfiguration und Einstellungen
+configuration:
+  # Erforderliche Konfigurationsparameter
+  required_config:
+    - "model_endpoint"
+    - "api_key"
+    - "default_language"
+
+  # Optionale Konfigurationsparameter
+  optional_config:
+    max_conversation_length:
+      type: "integer"
+      default: 100
+      description: "Maximale Anzahl Nachrichten pro Konversation"
+
+    conversation_timeout_minutes:
+      type: "integer"
+      default: 30
+      description: "Timeout für inaktive Konversationen"
+
+    enable_analytics:
+      type: "boolean"
+      default: true
+      description: "Analytics aktivieren"
+
+    content_filter_level:
+      type: "string"
+      enum: ["off", "low", "medium", "high", "strict"]
+      default: "medium"
+      description: "Content-Filter-Level"
+
+  # Umgebungsvariablen
+  environment_variables:
+    - name: "CHAT_MODEL_ENDPOINT"
+      description: "Endpoint für Chat-Modell"
+      required: true
+    - name: "CHAT_API_KEY"
+      description: "API-Key für Chat-Service"
+      required: true
+      sensitive: true
+    - name: "CHAT_DEFAULT_LANGUAGE"
+      description: "Standard-Sprache"
+      default: "de"
+
+# Performance und Limits
+performance:
+  # Erwartete Performance-Metriken
+  expected_metrics:
+    response_time_p95_ms: 2000
+    response_time_p99_ms: 5000
+    throughput_requests_per_second: 100
+    concurrent_conversations: 1000
+
+  # Resource-Anforderungen
+  resource_requirements:
+    min_memory_mb: 512
+    recommended_memory_mb: 1024
+    min_cpu_cores: 1
+    recommended_cpu_cores: 2
+    storage_mb: 100
+
+  # Rate-Limits
+  rate_limits:
+    requests_per_minute: 60
+    requests_per_hour: 1000
+    concurrent_requests: 10
+
+# Testing und Validation
+testing:
+  # Test-Szenarien
+  test_scenarios:
+    - name: "basic_chat"
+      description: "Basis-Chat-Funktionalität"
+      steps:
+        - action: "start_conversation"
+          expected_response: "greeting_message"
+        - action: "send_message"
+          input: "Hallo"
+          expected_response_contains: ["hallo", "hilfe"]
+        - action: "end_conversation"
+          expected_response: "farewell_message"
+
+    - name: "multi_turn_conversation"
+      description: "Multi-Turn-Dialog"
+      steps:
+        - action: "start_conversation"
+        - action: "send_message"
+          input: "Wie ist das Wetter?"
+        - action: "send_message"
+          input: "Und morgen?"
+          context_required: true
+        - action: "end_conversation"
+
+    - name: "language_detection"
+      description: "Sprach-Erkennung"
+      steps:
+        - action: "send_message"
+          input: "Hello, how are you?"
+          expected_detected_language: "en"
+        - action: "send_message"
+          input: "Bonjour, comment allez-vous?"
+          expected_detected_language: "fr"
+
+  # Validation-Regeln
+  validation_rules:
+    - rule: "response_not_empty"
+      description: "Antwort darf nicht leer sein"
+    - rule: "conversation_id_consistent"
+      description: "Konversations-ID muss konsistent sein"
+    - rule: "language_support"
+      description: "Unterstützte Sprachen müssen funktionieren"
+
+# Kompatibilität und Dependencies
+compatibility:
+  # Abhängigkeiten zu anderen Capabilities
+  dependencies:
+    optional:
+      - capability: "nlp"
+        version: ">=1.0.0"
+        reason: "Erweiterte Sprachverarbeitung"
+      - capability: "sentiment_analysis"
+        version: ">=1.0.0"
+        reason: "Sentiment-Erkennung in Nachrichten"
+
+  # Inkompatibilitäten
+  conflicts:
+    - capability: "legacy_chat"
+      reason: "Konfliktierende Chat-Implementierung"
+
+# Sicherheit und Compliance
+security:
+  # Sicherheitsanforderungen
+  requirements:
+    - "Input-Sanitization für alle Nachrichten"
+    - "Content-Filtering für schädliche Inhalte"
+    - "Rate-Limiting pro Benutzer"
+    - "Verschlüsselung von Konversationsdaten"
+
+  # Compliance-Standards
+  compliance:
+    - standard: "GDPR"
+      requirements:
+        - "Recht auf Löschung von Konversationsdaten"
+        - "Datenminimierung bei Kontext-Speicherung"
+    - standard: "CCPA"
+      requirements:
+        - "Transparenz über Datenverwendung"
+
+components:
+  schemas:
+    ChatMessage:
+      type: "object"
+      required: ["id", "content", "role", "timestamp"]
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+          description: "Eindeutige Nachrichten-ID"
+        content:
+          type: "string"
+          description: "Nachrichteninhalt"
+        role:
+          type: "string"
+          enum: ["user", "assistant", "system"]
+          description: "Rolle des Nachrichtensenders"
+        timestamp:
+          type: "string"
+          format: "date-time"
+          description: "Zeitstempel der Nachricht"
+        metadata:
+          type: "object"
+          description: "Zusätzliche Metadaten"

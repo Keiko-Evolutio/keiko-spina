@@ -1,0 +1,413 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KEI-MCP API Performance Dashboard",
+    "tags": ["kei-mcp", "performance", "sla"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🎯 SLA Overview",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m]))",
+            "legendFormat": "Tool Invocation P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~\".*resources.*\"}[5m]))",
+            "legendFormat": "Resource Access P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=~\".*tools.*\"}[5m]))",
+            "legendFormat": "Tool Discovery P95",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "Total RPS",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 150},
+                {"color": "red", "value": 200}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Total RPS"},
+              "properties": [
+                {"id": "unit", "value": "reqps"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "red", "value": null},
+                    {"color": "yellow", "value": 500},
+                    {"color": "green", "value": 1000}
+                  ]
+                }}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "📊 Request Latency Percentiles",
+        "type": "timeseries",
+        "gridPos": {"h": 9, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(kei_mcp_tool_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50 Tool Invocation",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95 Tool Invocation",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(kei_mcp_tool_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99 Tool Invocation",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"mode": "none", "group": "A"},
+              "axisPlacement": "auto",
+              "axisLabel": "",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false},
+              "thresholdsStyle": {"mode": "line"}
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 0.2}
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {"mode": "single", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 3,
+        "title": "🚀 Request Throughput",
+        "type": "timeseries",
+        "gridPos": {"h": 9, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(kei_mcp_tool_invocations_total[5m])",
+            "legendFormat": "Tool Invocations/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{endpoint=~\".*resources.*\"}[5m])",
+            "legendFormat": "Resource Access/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(http_requests_total{endpoint=~\".*servers.*\"}[5m])",
+            "legendFormat": "Server Management/sec",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "Total Requests/sec",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 500},
+                {"color": "green", "value": 1000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "❌ Error Rates",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"4..\"}[5m]) / rate(http_requests_total[5m])",
+            "legendFormat": "4xx Error Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])",
+            "legendFormat": "5xx Error Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kei_mcp_tool_validation_failures_total[5m]) / rate(kei_mcp_tool_invocations_total[5m])",
+            "legendFormat": "Validation Error Rate",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 20
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.05}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "🔄 Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+        "targets": [
+          {
+            "expr": "kei_mcp_circuit_breaker_state",
+            "legendFormat": "{{server_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"options": {"0": {"text": "CLOSED", "color": "green"}}, "type": "value"},
+              {"options": {"1": {"text": "OPEN", "color": "red"}}, "type": "value"},
+              {"options": {"2": {"text": "HALF_OPEN", "color": "yellow"}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 6,
+        "title": "💾 Resource Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25},
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024 / 1024",
+            "legendFormat": "Memory Usage GB",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_connection_pool_active",
+            "legendFormat": "Active Connections",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "CPU Usage %"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 70},
+                    {"color": "red", "value": 90}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Memory Usage GB"},
+              "properties": [
+                {"id": "unit", "value": "bytes"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 6442450944},
+                    {"color": "red", "value": 7516192768}
+                  ]
+                }}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "📈 Performance Trends (24h)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
+        "targets": [
+          {
+            "expr": "avg_over_time(histogram_quantile(0.95, rate(kei_mcp_tool_duration_seconds_bucket[5m]))[24h:1h])",
+            "legendFormat": "P95 Latency Trend",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(rate(http_requests_total[5m])[24h:1h])",
+            "legendFormat": "RPS Trend",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 3,
+              "fillOpacity": 20
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "P95 Latency Trend"},
+              "properties": [
+                {"id": "unit", "value": "s"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "RPS Trend"},
+              "properties": [
+                {"id": "unit", "value": "reqps"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"kei-mcp-api\"}, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        },
+        {
+          "name": "server",
+          "type": "query",
+          "query": "label_values(kei_mcp_servers_total, server_name)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "expr": "changes(up{job=\"kei-mcp-api\"}[1m])",
+          "iconColor": "blue",
+          "textFormat": "Deployment"
+        },
+        {
+          "name": "SLA Violations",
+          "datasource": "prometheus",
+          "expr": "ALERTS{alertname=~\".*Latency.*|.*Throughput.*\"}",
+          "iconColor": "red",
+          "textFormat": "{{alertname}}"
+        }
+      ]
+    }
+  }
+}

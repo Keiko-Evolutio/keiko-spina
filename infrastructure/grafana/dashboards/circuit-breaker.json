@@ -1,0 +1,504 @@
+{
+  "title": "KEI Webhook Circuit Breaker",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Circuit State",
+      "targets": [
+        {
+          "expr": "webhook_circuit_breaker_state",
+          "legendFormat": "{{target_id}} ({{tenant_id}})"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Errors by Type",
+      "targets": [
+        {
+          "expr": "sum by (error_type) (increase(webhook_errors_total[5m]))",
+          "legendFormat": "{{error_type}}"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Delivery Duration p95",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(webhook_delivery_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 36
+}
+
+{
+  "dashboard": {
+    "id": null,
+    "title": "KEI-MCP API - Circuit Breaker Monitoring",
+    "tags": ["kei-mcp", "circuit-breaker", "fault-tolerance"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(kei_mcp_circuit_breaker_state, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        },
+        {
+          "name": "server_name",
+          "type": "query",
+          "query": "label_values(kei_mcp_circuit_breaker_state{instance=~\"$instance\"}, server_name)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🔄 Circuit Breaker States Overview",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "kei_mcp_circuit_breaker_state{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "{{server_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {"text": "CLOSED", "color": "green"},
+                  "1": {"text": "OPEN", "color": "red"},
+                  "2": {"text": "HALF_OPEN", "color": "yellow"}
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            },
+            "custom": {
+              "displayMode": "lcd",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "center"
+        }
+      },
+      {
+        "id": 2,
+        "title": "📊 Circuit Breaker State Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "count by (state) (label_replace(kei_mcp_circuit_breaker_state{instance=~\"$instance\", server_name=~\"$server_name\"}, \"state\", \"CLOSED\", \"__name__\", \".*\") == 0)",
+            "legendFormat": "CLOSED",
+            "refId": "A"
+          },
+          {
+            "expr": "count by (state) (label_replace(kei_mcp_circuit_breaker_state{instance=~\"$instance\", server_name=~\"$server_name\"}, \"state\", \"OPEN\", \"__name__\", \".*\") == 1)",
+            "legendFormat": "OPEN",
+            "refId": "B"
+          },
+          {
+            "expr": "count by (state) (label_replace(kei_mcp_circuit_breaker_state{instance=~\"$instance\", server_name=~\"$server_name\"}, \"state\", \"HALF_OPEN\", \"__name__\", \".*\") == 2)",
+            "legendFormat": "HALF_OPEN",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "CLOSED"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "OPEN"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "HALF_OPEN"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "pie",
+          "tooltip": {"mode": "single", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "right", "values": ["value"]},
+          "displayLabels": ["name", "value"]
+        }
+      },
+      {
+        "id": 3,
+        "title": "⚡ Circuit Breaker Trips",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(kei_mcp_circuit_breaker_trips_total{instance=~\"$instance\", server_name=~\"$server_name\"}[5m])",
+            "legendFormat": "Trips/sec {{server_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(kei_mcp_circuit_breaker_trips_total{instance=~\"$instance\", server_name=~\"$server_name\"}[1h])",
+            "legendFormat": "Trips/hour {{server_name}}",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "auto",
+              "pointSize": 5,
+              "stacking": {"mode": "none", "group": "A"},
+              "axisPlacement": "auto",
+              "axisLabel": "",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false},
+              "thresholdsStyle": {"mode": "off"}
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 4,
+        "title": "📈 Failure Rate Trends",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "kei_mcp_circuit_breaker_failure_count{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Failure Count {{server_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_success_count{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Success Count {{server_name}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_failure_count{instance=~\"$instance\", server_name=~\"$server_name\"} / (kei_mcp_circuit_breaker_failure_count{instance=~\"$instance\", server_name=~\"$server_name\"} + kei_mcp_circuit_breaker_success_count{instance=~\"$instance\", server_name=~\"$server_name\"}) * 100",
+            "legendFormat": "Failure Rate % {{server_name}}",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "Failure Rate.*"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 10},
+                    {"color": "red", "value": 50}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "Success.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "Failure Count.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "⏰ Recovery Patterns",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "kei_mcp_circuit_breaker_last_failure_time{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Last Failure {{server_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_next_attempt_time{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Next Attempt {{server_name}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_recovery_timeout_seconds{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Recovery Timeout {{server_name}}",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "dateTimeAsIso",
+            "custom": {
+              "drawStyle": "points",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 0,
+              "pointSize": 8
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "Recovery Timeout.*"},
+              "properties": [
+                {"id": "unit", "value": "s"},
+                {"id": "custom.drawStyle", "value": "line"},
+                {"id": "custom.axisPlacement", "value": "right"}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "⚙️ Circuit Breaker Configuration",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "kei_mcp_circuit_breaker_failure_threshold{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Failure Threshold",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_recovery_timeout_seconds{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Recovery Timeout",
+            "refId": "B",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_state{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Current State",
+            "refId": "C",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "kei_mcp_circuit_breaker_failure_count{instance=~\"$instance\", server_name=~\"$server_name\"}",
+            "legendFormat": "Current Failures",
+            "refId": "D",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Current State"},
+              "properties": [
+                {"id": "mappings", "value": [
+                  {
+                    "options": {
+                      "0": {"text": "CLOSED", "color": "green"},
+                      "1": {"text": "OPEN", "color": "red"},
+                      "2": {"text": "HALF_OPEN", "color": "yellow"}
+                    },
+                    "type": "value"
+                  }
+                ]},
+                {"id": "custom.displayMode", "value": "color-background"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Current Failures"},
+              "properties": [
+                {"id": "custom.displayMode", "value": "color-background"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 3},
+                    {"color": "red", "value": 5}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Recovery Timeout"},
+              "properties": [
+                {"id": "unit", "value": "s"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [{"desc": false, "displayName": "server_name"}]
+        }
+      },
+      {
+        "id": 7,
+        "title": "📊 Circuit Breaker Health Score",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "100 - (kei_mcp_circuit_breaker_failure_count{instance=~\"$instance\", server_name=~\"$server_name\"} / kei_mcp_circuit_breaker_failure_threshold{instance=~\"$instance\", server_name=~\"$server_name\"} * 100)",
+            "legendFormat": "{{server_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 80}
+              ]
+            },
+            "custom": {
+              "displayMode": "gradient",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Circuit Breaker Trips",
+          "datasource": "prometheus",
+          "expr": "increase(kei_mcp_circuit_breaker_trips_total[1m]) > 0",
+          "iconColor": "red",
+          "textFormat": "CB Trip: {{server_name}}"
+        },
+        {
+          "name": "Circuit Breaker Recovery",
+          "datasource": "prometheus",
+          "expr": "changes(kei_mcp_circuit_breaker_state[1m]) and kei_mcp_circuit_breaker_state == 0",
+          "iconColor": "green",
+          "textFormat": "CB Recovered: {{server_name}}"
+        },
+        {
+          "name": "Circuit Breaker Half-Open",
+          "datasource": "prometheus",
+          "expr": "changes(kei_mcp_circuit_breaker_state[1m]) and kei_mcp_circuit_breaker_state == 2",
+          "iconColor": "yellow",
+          "textFormat": "CB Half-Open: {{server_name}}"
+        }
+      ]
+    }
+  }
+}

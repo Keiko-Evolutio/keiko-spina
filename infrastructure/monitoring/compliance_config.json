@@ -1,0 +1,92 @@
+{
+  "monitoring": {
+    "interval_seconds": 300,
+    "prometheus_port": 8090,
+    "alert_webhook_url": null,
+    "slack_webhook_url": null,
+    "grafana_dashboard_url": "http://localhost:3000/d/keiko-compliance",
+    "enable_email_alerts": false,
+    "email_recipients": []
+  },
+  "thresholds": {
+    "cross_imports": 0,
+    "api_contract_violations": 0,
+    "deployment_independence_score": 95.0,
+    "architecture_compliance_score": 90.0,
+    "dependency_graph_violations": 0,
+    "docker_isolation_score": 90.0
+  },
+  "checks": {
+    "cross_import_analysis": true,
+    "api_contract_validation": true,
+    "deployment_independence": true,
+    "docker_isolation": false,
+    "dependency_graph_analysis": true,
+    "performance_impact_analysis": false
+  },
+  "alerting": {
+    "alert_cooldown_minutes": 30,
+    "escalation_rules": {
+      "critical": {
+        "immediate_notification": true,
+        "escalate_after_minutes": 15,
+        "escalation_channels": ["slack", "webhook", "email"]
+      },
+      "warning": {
+        "immediate_notification": true,
+        "escalate_after_minutes": 60,
+        "escalation_channels": ["slack"]
+      },
+      "info": {
+        "immediate_notification": false,
+        "escalate_after_minutes": 0,
+        "escalation_channels": []
+      }
+    }
+  },
+  "metrics": {
+    "retention_days": 30,
+    "aggregation_intervals": ["5m", "1h", "1d"],
+    "custom_metrics": {
+      "api_response_time_compliance": {
+        "enabled": false,
+        "threshold_ms": 500,
+        "check_endpoints": [
+          "/api/v1/health",
+          "/api/v1/events/agent"
+        ]
+      },
+      "memory_usage_compliance": {
+        "enabled": false,
+        "threshold_mb": 512,
+        "check_processes": ["backend"]
+      }
+    }
+  },
+  "reporting": {
+    "daily_summary": true,
+    "weekly_report": true,
+    "monthly_trend_analysis": true,
+    "compliance_dashboard_refresh_seconds": 30,
+    "export_formats": ["json", "csv", "prometheus"]
+  },
+  "integrations": {
+    "github": {
+      "enabled": false,
+      "repository": "keiko-dev-team/keiko-personal-assistant",
+      "create_issues_on_violations": false,
+      "label_compliance_prs": false
+    },
+    "jira": {
+      "enabled": false,
+      "server_url": null,
+      "project_key": null,
+      "create_tickets_on_critical": false
+    },
+    "datadog": {
+      "enabled": false,
+      "api_key": null,
+      "send_custom_metrics": false
+    }
+  }
+}

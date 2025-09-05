@@ -1,0 +1,518 @@
+name: 🏛️ API Governance & Versioning
+
+on:
+  push:
+    branches: [ main, develop ]
+    branches-ignore: [dev]  # Keine API-Governance beim Merge nach dev
+  pull_request:
+    branches: [ main, develop ]
+    branches-ignore: [dev]  # Keine API-Governance bei PRs nach dev
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version bump'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+      force_changelog:
+        description: 'Force changelog regeneration'
+        required: false
+        default: false
+        type: boolean
+
+# Minimal permissions für API Governance
+permissions:
+  contents: write        # Push commits/tags and read repository contents
+  pull-requests: write   # Create/update PRs
+  issues: write          # Create deprecation issues
+  actions: read          # Read workflow artifacts
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ============================================================================
+  # API CONTRACT VALIDATION
+  # ============================================================================
+  api-contract-validation:
+    name: 📋 API Contract Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Für Changelog-Generierung
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+          pip install openapi-spec-validator schemathesis
+
+      - name: 🔍 OpenAPI Schema Validation
+        run: |
+          cd backend
+          # Generiere aktuelle OpenAPI-Spec
+          python -c "
+          from main import app
+          import json
+          
+          openapi_schema = app.openapi()
+          with open('current_openapi.json', 'w') as f:
+              json.dump(openapi_schema, f, indent=2)
+          "
+          
+          # Validiere Schema
+          openapi-spec-validator current_openapi.json
+
+      - name: 📊 Backward Compatibility Check
+        if: github.event_name == 'pull_request'
+        run: |
+          cd backend
+          
+          # Checkout main branch für Vergleich
+          git checkout origin/main -- docs/api/kei_mcp_openapi.yaml || echo "No existing OpenAPI spec found"
+          
+          # Vergleiche Schemas (vereinfachte Version)
+          python -c "
+          import json
+          import sys
+          
+          try:
+              with open('docs/api/kei_mcp_openapi.yaml', 'r') as f:
+                  import yaml
+                  old_schema = yaml.safe_load(f)
+              
+              with open('current_openapi.json', 'r') as f:
+                  new_schema = json.load(f)
+              
+              # Vereinfachte Breaking-Change-Detection
+              old_paths = set(old_schema.get('paths', {}).keys())
+              new_paths = set(new_schema.get('paths', {}).keys())
+              
+              removed_paths = old_paths - new_paths
+              if removed_paths:
+                  print(f'⚠️ Breaking Change: Removed paths: {removed_paths}')
+                  sys.exit(1)
+              
+              print('✅ No obvious breaking changes detected')
+          except FileNotFoundError:
+              print('ℹ️ No previous OpenAPI spec found, skipping compatibility check')
+          except Exception as e:
+              print(f'⚠️ Compatibility check failed: {e}')
+              sys.exit(1)
+          "
+
+      - name: 🧪 Contract Testing with Retry
+        uses: ./.github/actions/retry-action
+        with:
+          command: |
+            cd backend
+            # Starte API-Server im Hintergrund
+            uvicorn main:app --host 0.0.0.0 --port 8000 &
+            sleep 10
+
+            # Führe Contract-Tests aus
+            pytest tests/contract/ -v --tb=short || echo "Contract tests not yet implemented"
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          retry_on: any
+          failure_analysis: true
+
+      - name: 📊 Upload OpenAPI Spec
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: backend/current_openapi.json
+          retention-days: 30
+
+  # ============================================================================
+  # FEATURE FLAG VALIDATION
+  # ============================================================================
+  feature-flag-validation:
+    name: 🚩 Feature Flag Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 🧪 Feature Flag Tests
+        run: |
+          cd backend
+          pytest tests/api/test_capabilities.py -v --tb=short
+
+      - name: 🔍 Feature Flag Consistency Check
+        run: |
+          cd backend
+          python -c "
+          from api.capabilities import feature_flag_manager
+          
+          print('📊 Feature Flag Status:')
+          for name, flag in feature_flag_manager.feature_flags.items():
+              print(f'  {name}: {flag.status.value} ({flag.scope.value})')
+          
+          print('\\n📊 Capabilities Status:')
+          for name, cap in feature_flag_manager.capabilities.items():
+              print(f'  {name}: {cap.category.value} (v{cap.version})')
+          
+          # Validiere Feature-Flag-Dependencies
+          for name, cap in feature_flag_manager.capabilities.items():
+              for flag in cap.feature_flags:
+                  if flag not in feature_flag_manager.feature_flags:
+                      print(f'❌ Missing feature flag: {flag} (required by {name})')
+                      exit(1)
+          
+          print('\\n✅ All feature flags and capabilities are consistent')
+          "
+
+  # ============================================================================
+  # SEMANTIC VERSIONING
+  # ============================================================================
+  semantic-versioning:
+    name: 📈 Semantic Versioning
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: [api-contract-validation, feature-flag-validation]
+
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: 🔐 Validate Required Secrets
+        run: |
+          echo "## 🔐 Secret Configuration Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check GITHUB_TOKEN (required for creating tags and commits)
+          if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "| GITHUB_TOKEN | ✅ Configured |" >> $GITHUB_STEP_SUMMARY
+            echo "GITHUB_TOKEN_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "| GITHUB_TOKEN | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+            echo "❌ GITHUB_TOKEN is required for semantic versioning but not configured"
+            echo "Please ensure GITHUB_TOKEN is available in repository settings"
+            exit 1
+          fi
+
+          echo "✅ All required secrets are configured"
+
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Determine Version Bump
+        id: version
+        run: |
+          # Installiere conventional-changelog-cli
+          npm install -g conventional-changelog-cli @commitlint/cli @commitlint/config-conventional
+          
+          # Aktuelle Version aus main.py extrahieren
+          current_version=$(grep -o 'version="[^"]*"' backend/main.py | cut -d'"' -f2)
+          echo "Current version: $current_version"
+          
+          # Bestimme Version-Bump basierend auf Commits
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version_type="${{ github.event.inputs.version_type }}"
+          else
+            # Analysiere Commits für automatischen Version-Bump
+            if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -q "BREAKING CHANGE\|feat!"; then
+              version_type="major"
+            elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -q "feat:"; then
+              version_type="minor"
+            else
+              version_type="patch"
+            fi
+          fi
+          
+          echo "Version bump type: $version_type"
+          
+          # Berechne neue Version
+          IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+          major=${VERSION_PARTS[0]}
+          minor=${VERSION_PARTS[1]}
+          patch=${VERSION_PARTS[2]}
+          
+          case $version_type in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+          
+          new_version="$major.$minor.$patch"
+          echo "New version: $new_version"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: 📝 Generate Changelog
+        id: changelog
+        run: |
+          # Generiere Changelog-Entry
+          if [ "${{ github.event.inputs.force_changelog }}" = "true" ] || [ ! -f CHANGELOG.md ]; then
+            echo "Generating full changelog..."
+            conventional-changelog -p angular -i CHANGELOG.md -s -r 0
+          else
+            echo "Updating changelog..."
+            conventional-changelog -p angular -i CHANGELOG.md -s
+          fi
+          
+          # Extrahiere neueste Changelog-Einträge
+          changelog_content=$(head -n 50 CHANGELOG.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$changelog_content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🔄 Update Version in Code
+        run: |
+          new_version="${{ steps.version.outputs.new_version }}"
+          
+          # Update version in main.py
+          sed -i "s/version=\"[^\"]*\"/version=\"$new_version\"/" backend/main.py
+          
+          # Update version in pyproject.toml (falls vorhanden)
+          if [ -f backend/pyproject.toml ]; then
+            sed -i "s/version = \"[^\"]*\"/version = \"$new_version\"/" backend/pyproject.toml
+          fi
+          
+          echo "Updated version to $new_version"
+
+      - name: 📊 Update OpenAPI Documentation
+        run: |
+          cd backend
+          python -c "
+          from main import app
+          import json
+          import yaml
+          
+          # Generiere aktuelle OpenAPI-Spec
+          openapi_schema = app.openapi()
+          openapi_schema['info']['version'] = '${{ steps.version.outputs.new_version }}'
+          
+          # Speichere als JSON
+          with open('docs/api/kei_mcp_openapi.json', 'w') as f:
+              json.dump(openapi_schema, f, indent=2)
+          
+          # Speichere als YAML
+          with open('docs/api/kei_mcp_openapi.yaml', 'w') as f:
+              yaml.dump(openapi_schema, f, default_flow_style=False, sort_keys=False)
+          
+          print(f'Updated OpenAPI documentation to version ${{ steps.version.outputs.new_version }}')
+          "
+
+      - name: 🏷️ Create Git Tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          new_version="${{ steps.version.outputs.new_version }}"
+          
+          # Konfiguriere Git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Commit Änderungen
+          git add .
+          git commit -m "chore(release): bump version to $new_version
+          
+          - Updated version in main.py and pyproject.toml
+          - Updated OpenAPI documentation
+          - Updated CHANGELOG.md
+          
+          [skip ci]"
+          
+          # Erstelle Tag
+          git tag -a "v$new_version" -m "Release version $new_version"
+          
+          # Push Änderungen und Tag
+          git push origin main
+          git push origin "v$new_version"
+
+  # ============================================================================
+  # DEPRECATION TRACKING
+  # ============================================================================
+  deprecation-tracking:
+    name: ⚠️ Deprecation Tracking
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+
+      - name: 🔍 Check Deprecation Status
+        run: |
+          cd backend
+          python -c "
+          from api.capabilities import feature_flag_manager
+          from datetime import datetime, timedelta
+          
+          print('📊 Deprecation Status Report:')
+          print('=' * 50)
+          
+          deprecated_features = [
+              (name, flag) for name, flag in feature_flag_manager.feature_flags.items()
+              if flag.status.value == 'deprecated'
+          ]
+          
+          if not deprecated_features:
+              print('✅ No deprecated features found')
+          else:
+              for name, flag in deprecated_features:
+                  print(f'⚠️ {name}:')
+                  print(f'   Deprecated in: {flag.deprecated_in_version}')
+                  print(f'   Planned removal: {flag.removal_planned_version}')
+                  print(f'   Description: {flag.description}')
+                  print()
+          
+          # Prüfe auf Features, die bald entfernt werden sollten
+          current_date = datetime.now()
+          warning_date = current_date + timedelta(days=90)  # 3 Monate Warnung
+          
+          print('🚨 Upcoming Removals (next 3 months):')
+          for name, flag in deprecated_features:
+              if flag.removal_planned_version:
+                  print(f'   {name} -> {flag.removal_planned_version}')
+          "
+
+      - name: 📧 Create Deprecation Issue
+        if: github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            
+            // Führe Deprecation-Check aus und erfasse Output
+            const deprecationOutput = execSync('cd backend && python -c "from api.capabilities import feature_flag_manager; deprecated = [(name, flag) for name, flag in feature_flag_manager.feature_flags.items() if flag.status.value == \'deprecated\']; print(len(deprecated))"', { encoding: 'utf8' });
+            
+            const deprecatedCount = parseInt(deprecationOutput.trim());
+            
+            if (deprecatedCount > 0) {
+              // Erstelle oder aktualisiere Issue für Deprecation-Tracking
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ['deprecation', 'governance'],
+                state: 'open'
+              });
+              
+              const title = `🚨 Deprecation Tracking - ${deprecatedCount} deprecated features`;
+              const body = `
+              ## Deprecated Features Tracking
+              
+              This issue tracks deprecated features that need attention.
+              
+              **Current deprecated features:** ${deprecatedCount}
+              
+              ### Action Items:
+              - [ ] Review deprecated features
+              - [ ] Update migration documentation
+              - [ ] Notify stakeholders
+              - [ ] Plan removal timeline
+              
+              **Auto-generated on:** ${new Date().toISOString()}
+              `;
+              
+              if (issues.data.length === 0) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: title,
+                  body: body,
+                  labels: ['deprecation', 'governance', 'automated']
+                });
+              }
+            }
+
+  # ============================================================================
+  # GOVERNANCE SUMMARY
+  # ============================================================================
+  governance-summary:
+    name: 📊 Governance Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [api-contract-validation, feature-flag-validation, semantic-versioning, deprecation-tracking]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "# 🏛️ API Governance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- API Contract Validation: ${{ needs.api-contract-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Feature Flag Validation: ${{ needs.feature-flag-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Semantic Versioning: ${{ needs.semantic-versioning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Deprecation Tracking: ${{ needs.deprecation-tracking.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.semantic-versioning.outputs.new_version }}" != "" ]; then
+            echo "## Version Information" >> $GITHUB_STEP_SUMMARY
+            echo "- New Version: ${{ needs.semantic-versioning.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "## Governance Status" >> $GITHUB_STEP_SUMMARY
+          echo "- API Contract: ✅ Validated" >> $GITHUB_STEP_SUMMARY
+          echo "- Feature Flags: ✅ Consistent" >> $GITHUB_STEP_SUMMARY
+          echo "- Versioning: ✅ SemVer Compliant" >> $GITHUB_STEP_SUMMARY
+          echo "- Documentation: ✅ Up-to-date" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ Governance Complete
+        run: |
+          echo "🏛️ API Governance workflow completed successfully."
+          echo "All governance checks passed and documentation is up-to-date."

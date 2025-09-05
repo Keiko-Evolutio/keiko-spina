@@ -1,0 +1,187 @@
+# mTLS Configuration für Keiko Platform
+# Mutual TLS zwischen allen Services
+
+# Certificate Authority (CA) Configuration
+ca:
+  name: "Keiko Platform CA"
+  country: "DE"
+  organization: "Keiko Development Team"
+  organizational_unit: "Platform Security"
+  validity_days: 3650
+  key_size: 4096
+  
+  # CA Certificate Subject
+  subject:
+    common_name: "Keiko Platform Root CA"
+    country: "DE"
+    state: "Berlin"
+    locality: "Berlin"
+    organization: "Keiko Development Team"
+    organizational_unit: "Platform Security"
+
+# Service Certificates Configuration
+services:
+  keiko-backend:
+    common_name: "keiko-backend-service"
+    dns_names:
+      - "keiko-backend"
+      - "keiko-backend-service"
+      - "keiko-backend.keiko.svc.cluster.local"
+      - "localhost"
+    ip_addresses:
+      - "127.0.0.1"
+      - "10.0.0.0/8"
+    validity_days: 365
+    key_size: 2048
+    
+  keiko-frontend:
+    common_name: "keiko-frontend-service"
+    dns_names:
+      - "keiko-frontend"
+      - "keiko-frontend-service"
+      - "keiko-frontend.keiko.svc.cluster.local"
+      - "app.keiko.dev"
+      - "localhost"
+    ip_addresses:
+      - "127.0.0.1"
+    validity_days: 365
+    key_size: 2048
+    
+  kei-agent-sdk:
+    common_name: "kei-agent-sdk-service"
+    dns_names:
+      - "kei-agent-sdk"
+      - "kei-agent-sdk-service"
+      - "kei-agent-sdk.keiko-sdk.svc.cluster.local"
+      - "sdk.keiko.dev"
+      - "localhost"
+    ip_addresses:
+      - "127.0.0.1"
+    validity_days: 365
+    key_size: 2048
+    
+  keiko-api-contracts:
+    common_name: "keiko-api-contracts-service"
+    dns_names:
+      - "keiko-api-contracts"
+      - "keiko-api-contracts-service"
+      - "keiko-api-contracts.keiko.svc.cluster.local"
+      - "contracts.keiko.dev"
+      - "localhost"
+    ip_addresses:
+      - "127.0.0.1"
+    validity_days: 365
+    key_size: 2048
+
+# mTLS Configuration per Service
+mtls_config:
+  # Backend mTLS Settings
+  keiko-backend:
+    enabled: true
+    cert_path: "/etc/ssl/certs/keiko-backend.crt"
+    key_path: "/etc/ssl/private/keiko-backend.key"
+    ca_path: "/etc/ssl/certs/keiko-ca.crt"
+    verify_client: true
+    verify_depth: 2
+    cipher_suites:
+      - "ECDHE-RSA-AES256-GCM-SHA384"
+      - "ECDHE-RSA-AES128-GCM-SHA256"
+      - "ECDHE-RSA-AES256-SHA384"
+      - "ECDHE-RSA-AES128-SHA256"
+    protocols:
+      - "TLSv1.2"
+      - "TLSv1.3"
+    
+  # Frontend mTLS Settings
+  keiko-frontend:
+    enabled: true
+    cert_path: "/etc/ssl/certs/keiko-frontend.crt"
+    key_path: "/etc/ssl/private/keiko-frontend.key"
+    ca_path: "/etc/ssl/certs/keiko-ca.crt"
+    verify_client: false  # Frontend doesn't verify client certs
+    verify_depth: 2
+    cipher_suites:
+      - "ECDHE-RSA-AES256-GCM-SHA384"
+      - "ECDHE-RSA-AES128-GCM-SHA256"
+    protocols:
+      - "TLSv1.2"
+      - "TLSv1.3"
+    
+  # SDK mTLS Settings
+  kei-agent-sdk:
+    enabled: true
+    cert_path: "/etc/ssl/certs/kei-agent-sdk.crt"
+    key_path: "/etc/ssl/private/kei-agent-sdk.key"
+    ca_path: "/etc/ssl/certs/keiko-ca.crt"
+    verify_client: true
+    verify_depth: 2
+    cipher_suites:
+      - "ECDHE-RSA-AES256-GCM-SHA384"
+      - "ECDHE-RSA-AES128-GCM-SHA256"
+    protocols:
+      - "TLSv1.2"
+      - "TLSv1.3"
+
+# Certificate Rotation Configuration
+rotation:
+  enabled: true
+  check_interval: "24h"
+  renewal_threshold: "30d"  # Renew when 30 days left
+  backup_count: 5
+  
+  # Notification settings
+  notifications:
+    enabled: true
+    email: "security@keiko.dev"
+    webhook: "https://hooks.keiko.dev/cert-rotation"
+    
+# Security Policies
+security_policies:
+  # Minimum TLS version
+  min_tls_version: "1.2"
+  
+  # Certificate validation
+  strict_validation: true
+  check_revocation: true
+  
+  # OCSP settings
+  ocsp:
+    enabled: true
+    responder_url: "http://ocsp.keiko.dev"
+    timeout: "10s"
+    
+  # Certificate Transparency
+  ct_logs:
+    enabled: true
+    logs:
+      - "https://ct.googleapis.com/logs/argon2024/"
+      - "https://ct.cloudflare.com/logs/nimbus2024/"
+
+# Monitoring and Alerting
+monitoring:
+  enabled: true
+  metrics_port: 9091
+  
+  # Certificate expiry alerts
+  alerts:
+    cert_expiry_warning: "30d"
+    cert_expiry_critical: "7d"
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval: "30s"
+    timeout: "5s"
+    
+# Development Settings
+development:
+  # Generate self-signed certs for development
+  self_signed: true
+  
+  # Skip certificate validation in dev
+  skip_verification: false  # Keep false for security
+  
+  # Development CA settings
+  dev_ca:
+    name: "Keiko Development CA"
+    validity_days: 365

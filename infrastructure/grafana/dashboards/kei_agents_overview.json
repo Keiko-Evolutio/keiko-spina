@@ -1,0 +1,45 @@
+{
+  "title": "KEI Agents Overview",
+  "tags": ["kei", "agents"],
+  "timezone": "browser",
+  "editable": true,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Agent Requests per Minute",
+      "targets": [
+        {
+          "expr": "sum by(agent_id) (increase(http_requests_total{route=~\"/api/.+\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent Task Latency p95 (ms)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le,operation) (rate(kei_performance_duration_ms_bucket[5m])))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate (5m)",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_errors_total[5m])) / sum(rate(http_requests_total[5m]))"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Depth / Concurrency",
+      "targets": [
+        { "expr": "avg_over_time(kei_agent_queue_length[5m])" },
+        { "expr": "avg_over_time(kei_agent_concurrency[5m])" }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}

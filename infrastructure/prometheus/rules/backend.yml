@@ -1,0 +1,21 @@
+groups:
+  - name: keiko.backend
+    interval: 30s
+    rules:
+      - alert: BackendHighMemory
+        expr: process_resident_memory_bytes > 1500000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend RAM hoch"
+          description: "RSS > 1.5 GiB"
+
+      - alert: BackendHighCPU
+        expr: rate(process_cpu_seconds_total[1m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend CPU hoch"
+          description: ">80% CPU für 5 Minuten"

@@ -1,0 +1,121 @@
+# backend/.ruff.toml
+
+target-version = "py312"
+line-length = 100
+indent-width = 4
+
+# Exclude directories and files
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "venv",
+  "migrations",
+]
+
+[lint]
+# Enable comprehensive rule sets
+select = [
+  "E", # pycodestyle errors
+  "W", # pycodestyle warnings
+  "F", # Pyflakes
+  "I", # isort
+  "B", # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "D", # pydocstyle
+  "UP", # pyupgrade
+  "ARG", # flake8-unused-arguments
+  "SIM", # flake8-simplify
+  "TCH", # flake8-type-checking
+  "ISC", # flake8-implicit-str-concat
+  "ICN", # flake8-import-conventions
+  "PIE", # flake8-pie
+  "T20", # flake8-print
+  "PT", # flake8-pytest-style
+  "Q", # flake8-quotes
+  "RSE", # flake8-raise
+  "RET", # flake8-return
+  "SLF", # flake8-self
+  "S", # flake8-bandit
+  "N", # pep8-naming
+  "ERA", # eradicate
+  "PGH", # pygrep-hooks
+  "PL", # Pylint
+  "TRY", # tryceratops
+  "FLY", # flynt
+  "PERF", # Perflint
+  "RUF", # Ruff-specific rules
+]
+
+ignore = [
+  "D100", # Missing docstring in public module
+  "D101", # Missing docstring in public class
+  "D102", # Missing docstring in public method
+  "D103", # Missing docstring in public function
+  "D104", # Missing docstring in public package
+  "D105", # Missing docstring in magic method
+  "D107", # Missing docstring in __init__
+  "S101", # Use of assert detected (OK in tests)
+  "S603", # subprocess call - allow for dev scripts
+  "PLR0913", # Too many arguments to function call
+  "PLR0915", # Too many statements
+  "TRY003", # Avoid specifying long messages outside exception class
+  "B008", # Do not perform function calls in argument defaults
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.per-file-ignores]
+"tests/**/*" = [
+  "D", # Ignore docstring requirements in tests
+  "S101", # Allow assert in tests
+  "ARG", # Allow unused arguments in tests
+  "PLR2004", # Allow magic values in tests
+  "S105", # Allow hardcoded passwords in tests
+  "S106", # Allow hardcoded passwords in tests
+]
+"scripts/**/*" = [
+  "T201", # Allow print statements in scripts
+  "S603", # Allow subprocess calls in scripts
+]
+"migrations/**/*" = [
+  "D", # Ignore docstrings in migrations
+]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.isort]
+known-first-party = ["agents", "services", "config", "data_models", "monitoring", "storage", "voice"]
+known-third-party = ["fastapi", "azure", "openai", "redis", "httpx"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

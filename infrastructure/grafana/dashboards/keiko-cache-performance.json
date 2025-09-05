@@ -1,0 +1,104 @@
+{
+  "title": "Keiko Cache Performance",
+  "tags": ["keiko", "cache"],
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Cache Hit Ratio",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "avg(keiko_cache_hit_ratio) by (cache_type)", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Operations (hits/misses)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (operation)(rate(keiko_cache_operations_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Deduplication Rate",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (status)(rate(keiko_request_deduplication_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Size (Bytes)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "sum by (cache_type)(keiko_cache_size_bytes)", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Evictions",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (reason)(rate(keiko_cache_eviction_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Cache Effectiveness Ratio (304/(200+304))",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "keiko_http_cache_effectiveness_ratio",
+          "refId": "A",
+          "legendFormat": "{{endpoint}} {{method}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Cache 304 vs 200",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint,method,response_type) (rate(keiko_http_cache_response_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{endpoint}} {{method}} {{response_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "ETag Generations",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(keiko_http_cache_etag_generated_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "TTL Rule Applications",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 64 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint,pattern,ttl) (rate(keiko_http_cache_ttl_rule_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{endpoint}} {{pattern}} ttl={{ttl}}"
+        }
+      ]
+    }
+  ]
+}

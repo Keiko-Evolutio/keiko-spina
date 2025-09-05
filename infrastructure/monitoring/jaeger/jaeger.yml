@@ -1,0 +1,12 @@
+# Jaeger configuration for distributed tracing
+collector:
+  zipkin:
+    host-port: 9411
+
+storage:
+  type: memory
+  memory:
+    max-traces: 10000
+
+query:
+  base-path: /

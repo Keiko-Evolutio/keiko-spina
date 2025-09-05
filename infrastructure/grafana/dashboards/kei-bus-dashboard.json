@@ -1,0 +1,38 @@
+{
+  "title": "KEI-Bus Overview",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Publish/Consume Rate",
+      "targets": [
+        {
+          "expr": "counter_bus.messages.published",
+          "legendFormat": "published"
+        },
+        { "expr": "counter_bus.messages.consumed", "legendFormat": "consumed" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "End-to-End Latency (ms)",
+      "targets": [
+        {
+          "expr": "histogram_bus.end_to_end.latency_ms",
+          "legendFormat": "latency"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DLQ / Errors / Redeliveries",
+      "targets": [
+        { "expr": "counter_bus.messages.dlq", "legendFormat": "dlq" },
+        { "expr": "counter_bus.messages.errors", "legendFormat": "errors" },
+        {
+          "expr": "counter_bus.messages.redeliveries",
+          "legendFormat": "redeliveries"
+        }
+      ]
+    }
+  ]
+}

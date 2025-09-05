@@ -1,0 +1,525 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KEI-MCP API - USE Metrics",
+    "tags": ["kei-mcp", "use-metrics", "resource-monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"kei-mcp-api\"}, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "💻 CPU Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=\"kei-mcp-api\", instance=~\"$instance\"}[5m]) * 100",
+            "legendFormat": "CPU Usage % {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(rate(process_cpu_seconds_total{job=\"kei-mcp-api\", instance=~\"$instance\"}[5m])) * 100",
+            "legendFormat": "Average CPU %",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 2,
+        "title": "💾 Memory Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"kei-mcp-api\", instance=~\"$instance\"} / 1024 / 1024 / 1024",
+            "legendFormat": "Memory Usage GB {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "process_virtual_memory_bytes{job=\"kei-mcp-api\", instance=~\"$instance\"} / 1024 / 1024 / 1024",
+            "legendFormat": "Virtual Memory GB {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(process_resident_memory_bytes{job=\"kei-mcp-api\", instance=~\"$instance\"}) / 1024 / 1024 / 1024",
+            "legendFormat": "Average Memory GB",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 6442450944},
+                {"color": "red", "value": 8589934592}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "🔗 Connection Pool Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+        "targets": [
+          {
+            "expr": "kei_mcp_connection_pool_active{instance=~\"$instance\"}",
+            "legendFormat": "Active Connections {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "kei_mcp_connection_pool_idle{instance=~\"$instance\"}",
+            "legendFormat": "Idle Connections {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_connection_pool_max{instance=~\"$instance\"}",
+            "legendFormat": "Max Connections {{instance}}",
+            "refId": "C"
+          },
+          {
+            "expr": "kei_mcp_connection_pool_active{instance=~\"$instance\"} / kei_mcp_connection_pool_max{instance=~\"$instance\"} * 100",
+            "legendFormat": "Pool Utilization % {{instance}}",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "Pool Utilization.*"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "custom.drawStyle", "value": "bars"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 70},
+                    {"color": "red", "value": 90}
+                  ]
+                }}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "title": "📊 Request Queue Saturation",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "kei_mcp_request_queue_size{instance=~\"$instance\"}",
+            "legendFormat": "Queue Size {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "kei_mcp_request_queue_max{instance=~\"$instance\"}",
+            "legendFormat": "Max Queue Size {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kei_mcp_request_queue_dropped_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Dropped Requests/sec {{instance}}",
+            "refId": "C"
+          },
+          {
+            "expr": "kei_mcp_request_queue_size{instance=~\"$instance\"} / kei_mcp_request_queue_max{instance=~\"$instance\"} * 100",
+            "legendFormat": "Queue Saturation % {{instance}}",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "Queue Saturation.*"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 70},
+                    {"color": "red", "value": 90}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "Dropped.*"},
+              "properties": [
+                {"id": "unit", "value": "reqps"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "🔄 Thread Pool Saturation",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "kei_mcp_thread_pool_active{instance=~\"$instance\"}",
+            "legendFormat": "Active Threads {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "kei_mcp_thread_pool_max{instance=~\"$instance\"}",
+            "legendFormat": "Max Threads {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_thread_pool_queue_size{instance=~\"$instance\"}",
+            "legendFormat": "Thread Queue Size {{instance}}",
+            "refId": "C"
+          },
+          {
+            "expr": "kei_mcp_thread_pool_active{instance=~\"$instance\"} / kei_mcp_thread_pool_max{instance=~\"$instance\"} * 100",
+            "legendFormat": "Thread Pool Utilization % {{instance}}",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": ".*Utilization.*"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 80},
+                    {"color": "red", "value": 95}
+                  ]
+                }}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "🚫 Rate Limit Saturation",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(kei_mcp_rate_limit_hits_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Rate Limit Hits/sec {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kei_mcp_rate_limit_rejected_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Rate Limit Rejections/sec {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_rate_limit_current{instance=~\"$instance\"}",
+            "legendFormat": "Current Rate Limit {{instance}}",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(kei_mcp_rate_limit_rejected_total{instance=~\"$instance\"}[5m]) / (rate(kei_mcp_rate_limit_hits_total{instance=~\"$instance\"}[5m]) + rate(kei_mcp_rate_limit_rejected_total{instance=~\"$instance\"}[5m])) * 100",
+            "legendFormat": "Rejection Rate % {{instance}}",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "Rejection Rate.*"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 5},
+                    {"color": "red", "value": 10}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": ".*Rejections.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "❌ System Errors",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(kei_mcp_system_errors_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "System Errors/sec {{error_type}} {{instance}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kei_mcp_resource_exhaustion_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Resource Exhaustion/sec {{resource_type}} {{instance}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kei_mcp_health_check_failures_total{instance=~\"$instance\"}",
+            "legendFormat": "Health Check Failures {{check_name}} {{instance}}",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(kei_mcp_circuit_breaker_trips_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Circuit Breaker Trips/sec {{server_name}} {{instance}}",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 20
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "📈 Resource Utilization Summary",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "avg(rate(process_cpu_seconds_total{job=\"kei-mcp-api\", instance=~\"$instance\"}[5m])) * 100",
+            "legendFormat": "CPU %",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(process_resident_memory_bytes{job=\"kei-mcp-api\", instance=~\"$instance\"}) / 1024 / 1024 / 1024",
+            "legendFormat": "Memory GB",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(kei_mcp_connection_pool_active{instance=~\"$instance\"} / kei_mcp_connection_pool_max{instance=~\"$instance\"}) * 100",
+            "legendFormat": "Connection Pool %",
+            "refId": "C"
+          },
+          {
+            "expr": "avg(kei_mcp_request_queue_size{instance=~\"$instance\"} / kei_mcp_request_queue_max{instance=~\"$instance\"}) * 100",
+            "legendFormat": "Queue Saturation %",
+            "refId": "D"
+          },
+          {
+            "expr": "sum(rate(kei_mcp_rate_limit_rejected_total{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "Rate Limit Rejections/sec",
+            "refId": "E"
+          },
+          {
+            "expr": "sum(rate(kei_mcp_system_errors_total{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "System Errors/sec",
+            "refId": "F"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "lcd",
+              "orientation": "horizontal"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "CPU %"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "max", "value": 100}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Memory GB"},
+              "properties": [
+                {"id": "unit", "value": "bytes"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 6},
+                    {"color": "red", "value": 8}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": ".*%"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "max", "value": 100}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": ".*/sec"},
+              "properties": [
+                {"id": "unit", "value": "reqps"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 1},
+                    {"color": "red", "value": 10}
+                  ]
+                }}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Resource Alerts",
+          "datasource": "prometheus",
+          "expr": "ALERTS{alertname=~\".*CPU.*|.*Memory.*|.*Connection.*\"}",
+          "iconColor": "orange",
+          "textFormat": "{{alertname}}"
+        },
+        {
+          "name": "Saturation Alerts",
+          "datasource": "prometheus",
+          "expr": "ALERTS{alertname=~\".*Saturation.*|.*Queue.*|.*Pool.*\"}",
+          "iconColor": "red",
+          "textFormat": "{{alertname}}"
+        }
+      ]
+    }
+  }
+}

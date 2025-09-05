@@ -1,0 +1,30 @@
+groups:
+  - name: keiko.api
+    interval: 30s
+    rules:
+      - alert: ApiResponseTimeWarning
+        expr: histogram_quantile(0.95, rate(keiko_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API Antwortzeit > 2s"
+          description: "P95 Antwortzeit {{ $value }}s"
+
+      - alert: ApiResponseTimeCritical
+        expr: histogram_quantile(0.95, rate(keiko_http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Antwortzeit > 5s"
+          description: "P95 Antwortzeit {{ $value }}s"
+
+      - alert: ServiceDown
+        expr: up{job="keiko-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend nicht erreichbar"
+          description: "Keiko Backend down > 1min"

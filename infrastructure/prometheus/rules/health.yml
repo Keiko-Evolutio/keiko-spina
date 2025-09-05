@@ -1,0 +1,33 @@
+groups:
+  - name: keiko.health
+    interval: 30s
+    rules:
+      # Health Endpoint Failure (Critical)
+      - alert: HealthEndpointFailing
+        expr: up{job="keiko-backend"} == 1 and (probe_success == 0)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health Endpoint failing"
+          description: "The health probe is failing"
+
+      # SLA Latency Warning (p95 > 200ms)
+      - alert: HealthSLA_LatencyWarning
+        expr: histogram_quantile(0.95, rate(keiko_http_request_duration_seconds_bucket{endpoint="/health"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Health latency p95 > 200ms"
+          description: "Health endpoint p95 latency is {{ $value }}s"
+
+      # Availability below target (using custom availability metric if available)
+      - alert: HealthAvailabilityCritical
+        expr: avg_over_time(keiko_health_availability_ratio[15m]) < 0.999
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health availability below 99.9%"
+          description: "Observed availability is {{ $value }} over 15m"

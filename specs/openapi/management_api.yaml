@@ -1,0 +1,476 @@
+# specs/openapi/management_api.yaml
+openapi: 3.0.3
+
+info:
+  title: KEI-Agent-Framework Management API
+  version: 1.0.0
+  description: |
+    Vollständige Management-API für das KEI-Agent-Framework mit erweiterten
+    Enterprise-Features einschließlich Agent Registry, Multi-Tenancy,
+    Version Pinning und Rollout-Management.
+
+    **Hauptfunktionalitäten:**
+    - Agent-Registrierung und -Management
+    - Multi-Tenant-Isolation und -Verwaltung
+    - Semantische Versionierung mit Constraint-Resolution
+    - Advanced Agent Discovery mit verschiedenen Strategien
+    - Rollout-Management mit Canary, Blue-Green und Rolling Deployments
+    - Umfassendes Health-Monitoring und Performance-Metriken
+    - Policy-Management und Compliance-Checks
+
+  contact:
+    name: KEI-Agent-Framework Development Team
+    email: dev@Keiko Personal Assistantcom
+    url: https://github.com/kei-agent-framework
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://Keiko Personal Assistantcom/terms
+
+servers:
+  - url: http://localhost:8000
+    description: Lokale Entwicklungsumgebung
+  - url: https://api.Keiko Personal Assistantcom
+    description: Produktionsumgebung
+  - url: https://staging-api.Keiko Personal Assistantcom
+    description: Staging-Umgebung
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # Agent Registry Management
+  /api/v1/registry/agents:
+    post:
+      tags: [Agent Registry]
+      summary: Registriert neuen Agent
+      description: |
+        Registriert einen neuen Agent in der Enhanced Registry mit
+        vollständiger Versions- und Tenant-Unterstützung.
+      operationId: registerAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentRegistrationRequest"
+            examples:
+              basic_agent:
+                summary: Basis-Agent-Registrierung
+                value:
+                  agent_id: "chatbot-pro"
+                  name: "Professional Chatbot"
+                  version: "1.0.0"
+                  tenant_id: "enterprise-corp"
+                  description: "Enterprise-grade Chatbot für Kundensupport"
+                  capabilities: ["chat", "nlp", "sentiment_analysis"]
+                  tags: ["chatbot", "production", "enterprise"]
+                  access_level: "private"
+              versioned_agent:
+                summary: Agent mit Framework-Constraint
+                value:
+                  agent_id: "data-analyzer"
+                  name: "Advanced Data Analyzer"
+                  version: "2.1.0"
+                  tenant_id: "research-lab"
+                  description: "ML-basierter Datenanalysator"
+                  capabilities: ["data_analysis", "ml", "visualization"]
+                  framework_version_constraint: "^1.0.0"
+                  access_level: "public"
+      responses:
+        "201":
+          description: Agent erfolgreich registriert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+              examples:
+                success_response:
+                  summary: Erfolgreiche Registrierung
+                  value:
+                    agent_id: "chatbot-pro"
+                    name: "Professional Chatbot"
+                    version: "1.0.0"
+                    tenant_id: "enterprise-corp"
+                    status: "available"
+                    access_level: "private"
+                    created_at: "2024-01-15T10:30:00Z"
+                    updated_at: "2024-01-15T10:30:00Z"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntityError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      tags: [Agent Registry]
+      summary: Listet Agents auf
+      description: |
+        Listet alle verfügbaren Agents basierend auf Filtern und
+        Zugriffsberechtigung auf.
+      operationId: listAgents
+      parameters:
+        - name: tenant_id
+          in: query
+          description: Filter nach Tenant-ID
+          schema:
+            type: string
+            example: "enterprise-corp"
+        - name: include_versions
+          in: query
+          description: Alle Versionen einschließen
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          description: Maximale Anzahl Ergebnisse
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+        - name: capabilities
+          in: query
+          description: Filter nach Capabilities (komma-separiert)
+          schema:
+            type: string
+            example: "chat,nlp"
+        - name: tags
+          in: query
+          description: Filter nach Tags (komma-separiert)
+          schema:
+            type: string
+            example: "production,enterprise"
+        - name: access_level
+          in: query
+          description: Filter nach Zugriffslevel
+          schema:
+            $ref: "#/components/schemas/AccessLevel"
+      responses:
+        "200":
+          description: Liste von Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentResponse"
+                  total_count:
+                    type: integer
+                    description: Gesamtanzahl verfügbarer Agents
+                  page_info:
+                    $ref: "#/components/schemas/PageInfo"
+              examples:
+                agent_list:
+                  summary: Agent-Liste
+                  value:
+                    agents:
+                      - agent_id: "chatbot-pro"
+                        name: "Professional Chatbot"
+                        version: "1.0.0"
+                        tenant_id: "enterprise-corp"
+                        capabilities: ["chat", "nlp"]
+                        status: "available"
+                    total_count: 1
+                    page_info:
+                      has_next_page: false
+                      has_previous_page: false
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/registry/agents/{agent_id}:
+    get:
+      tags: [Agent Registry]
+      summary: Holt Agent-Informationen
+      description: |
+        Holt detaillierte Informationen zu einem spezifischen Agent
+        basierend auf Versions-Constraint.
+      operationId: getAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: Eindeutige Agent-ID
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+            example: "chatbot-pro"
+        - name: version
+          in: query
+          description: Versions-Constraint (SemVer)
+          schema:
+            type: string
+            default: "latest"
+            examples:
+              - "latest"
+              - "^1.0.0"
+              - "~1.2.3"
+              - "=1.0.0"
+              - ">=1.0.0"
+        - name: tenant_id
+          in: query
+          description: Tenant-ID für Zugriffsprüfung
+          schema:
+            type: string
+            example: "enterprise-corp"
+      responses:
+        "200":
+          description: Agent-Informationen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      tags: [Agent Registry]
+      summary: Aktualisiert Agent-Konfiguration
+      description: |
+        Aktualisiert die Konfiguration und Metadaten eines bestehenden Agents.
+      operationId: updateAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: Eindeutige Agent-ID
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentUpdateRequest"
+      responses:
+        "200":
+          description: Agent erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntityError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags: [Agent Registry]
+      summary: Entfernt Agent
+      description: |
+        Entfernt einen Agent aus der Registry. Diese Operation kann nicht
+        rückgängig gemacht werden.
+      operationId: deleteAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: Eindeutige Agent-ID
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+        - name: force
+          in: query
+          description: Erzwingt Löschung auch bei aktiven Abhängigkeiten
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "204":
+          description: Agent erfolgreich entfernt
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # Advanced Discovery
+  /api/v1/registry/discovery:
+    post:
+      tags: [Agent Discovery]
+      summary: Erweiterte Agent-Discovery
+      description: |
+        Führt erweiterte Agent-Discovery mit verschiedenen Strategien durch,
+        einschließlich Capability-, Health-, Load- und Geographic-basierter Suche.
+      operationId: discoverAgents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoveryRequest"
+            examples:
+              capability_discovery:
+                summary: Capability-basierte Discovery
+                value:
+                  capabilities: ["chat", "nlp"]
+                  strategy: "capability_based"
+                  max_results: 10
+                  min_health_score: 0.8
+              geographic_discovery:
+                summary: Geografische Discovery
+                value:
+                  capabilities: ["data_analysis"]
+                  strategy: "geographic"
+                  client_location:
+                    region: "eu-west-1"
+                    zone: "eu-west-1a"
+                    latitude: 52.5200
+                    longitude: 13.4050
+                  max_distance_km: 1000
+                  preferred_regions: ["eu-west-1", "eu-central-1"]
+      responses:
+        "200":
+          description: Discovery-Ergebnisse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DiscoveryResult"
+                  query_info:
+                    $ref: "#/components/schemas/DiscoveryQueryInfo"
+                  execution_time_ms:
+                    type: number
+                    description: Ausführungszeit der Discovery in Millisekunden
+              examples:
+                discovery_results:
+                  summary: Discovery-Ergebnisse
+                  value:
+                    agents:
+                      - agent:
+                          agent_id: "chatbot-pro"
+                          name: "Professional Chatbot"
+                          capabilities: ["chat", "nlp"]
+                        score: 0.95
+                        match_reasons: ["Excellent health score", "Low load"]
+                        distance_km: 150.5
+                    query_info:
+                      strategy: "hybrid"
+                      total_candidates: 25
+                      filtered_candidates: 3
+                    execution_time_ms: 45.2
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # Statistics and Health
+  /api/v1/registry/statistics:
+    get:
+      tags: [Statistics]
+      summary: Holt Registry-Statistiken
+      description: |
+        Holt umfassende Statistiken über die Registry-Nutzung und -Performance.
+      operationId: getRegistryStatistics
+      responses:
+        "200":
+          description: Registry-Statistiken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistryStatistics"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/registry/health:
+    get:
+      tags: [Health]
+      summary: Registry-Gesundheitscheck
+      description: |
+        Führt umfassenden Gesundheitscheck der Registry durch.
+      operationId: getRegistryHealth
+      responses:
+        "200":
+          description: Registry-Gesundheitsstatus
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Registry nicht verfügbar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /api/v1/registry/cleanup:
+    post:
+      tags: [Maintenance]
+      summary: Registry-Cleanup
+      description: |
+        Führt Cleanup-Operationen für veraltete Daten durch.
+      operationId: cleanupRegistry
+      parameters:
+        - name: max_age_days
+          in: query
+          description: Maximales Alter für Cleanup in Tagen
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 90
+        - name: dry_run
+          in: query
+          description: Führt Cleanup-Simulation durch ohne Änderungen
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Cleanup erfolgreich durchgeführt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupResult"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"

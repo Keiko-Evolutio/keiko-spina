@@ -1,0 +1,526 @@
+openapi: 3.0.3
+info:
+  title: Keiko Backend-Frontend API
+  version: 1.0.0
+  description: |
+    REST API for communication between Keiko Backend and Frontend.
+    This API provides all necessary endpoints for the frontend to interact
+    with backend services without direct dependencies.
+  contact:
+    name: Keiko Development Team
+    email: dev@keiko.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.keiko.ai
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Agent Management Endpoints
+  /api/v1/agents:
+    get:
+      summary: List Agents
+      description: Retrieve list of all registered agents
+      tags: [Agents]
+      parameters:
+        - name: status
+          in: query
+          description: Filter agents by status
+          schema:
+            type: string
+            enum: [online, offline, busy, error]
+        - name: capability
+          in: query
+          description: Filter agents by capability
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Create Agent
+      description: Register a new agent in the system
+      tags: [Agents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentRequest'
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/agents/{agentId}:
+    get:
+      summary: Get Agent Details
+      description: Retrieve details of a specific agent
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200':
+          description: Agent details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      summary: Update Agent
+      description: Update agent configuration
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentRequest'
+      responses:
+        '200':
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete Agent
+      description: Unregister agent from the system
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '204':
+          description: Agent deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Function Call Endpoints
+  /api/v1/agents/{agentId}/call:
+    post:
+      summary: Call Agent Function
+      description: Execute a function on a specific agent
+      tags: [Function Calls]
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunctionCallRequest'
+      responses:
+        '200':
+          description: Function executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionCallResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '408':
+          description: Function call timeout
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # Voice Processing Endpoints
+  /api/v1/voice/process:
+    post:
+      summary: Process Voice Input
+      description: Process voice input through the voice processing pipeline
+      tags: [Voice]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio_file:
+                  type: string
+                  format: binary
+                  description: Audio file to process
+                language:
+                  type: string
+                  description: Language code (e.g., 'en-US')
+                  default: 'en-US'
+                user_id:
+                  type: string
+                  description: User identifier
+                session_id:
+                  type: string
+                  description: Session identifier
+      responses:
+        '200':
+          description: Voice processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceProcessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # Health Check Endpoint
+  /api/v1/health:
+    get:
+      summary: Health Check
+      description: Check API health status
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      description: Agent identifier
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+
+  schemas:
+    Agent:
+      type: object
+      required:
+        - agent_id
+        - agent_type
+        - status
+        - capabilities
+        - registered_at
+      properties:
+        agent_id:
+          type: string
+          description: Unique agent identifier
+          example: "code_assistant_001"
+        platform_agent_id:
+          type: string
+          description: Platform-assigned agent ID
+          example: "platform_code_assistant_001"
+        agent_type:
+          type: string
+          description: Type of agent
+          example: "code_assistant"
+        status:
+          type: string
+          enum: [online, offline, busy, error]
+          description: Current agent status
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: List of agent capabilities
+          example: ["code_generation", "debugging", "testing"]
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional agent metadata
+        registered_at:
+          type: string
+          format: date-time
+          description: Registration timestamp
+        last_activity:
+          type: string
+          format: date-time
+          description: Last activity timestamp
+
+    AgentList:
+      type: object
+      required:
+        - agents
+        - total
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Agent'
+        total:
+          type: integer
+          description: Total number of agents
+        filters:
+          type: object
+          description: Applied filters
+          properties:
+            status:
+              type: string
+            capability:
+              type: string
+
+    CreateAgentRequest:
+      type: object
+      required:
+        - agent_id
+        - agent_type
+        - capabilities
+      properties:
+        agent_id:
+          type: string
+          description: Unique agent identifier
+          pattern: '^[a-zA-Z0-9_-]+$'
+        agent_type:
+          type: string
+          description: Type of agent
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: List of agent capabilities
+          minItems: 1
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional agent metadata
+        max_concurrent_requests:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 5
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+
+    UpdateAgentRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [online, offline, busy]
+        capabilities:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        max_concurrent_requests:
+          type: integer
+          minimum: 1
+          maximum: 100
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+
+    FunctionCallRequest:
+      type: object
+      required:
+        - function_name
+        - parameters
+      properties:
+        function_name:
+          type: string
+          description: Name of function to call
+          example: "generate_code"
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Function parameters
+        user_id:
+          type: string
+          description: User identifier
+        session_id:
+          type: string
+          description: Session identifier
+        timeout:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+          description: Function timeout in seconds
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10
+          default: 0
+          description: Request priority
+
+    FunctionCallResponse:
+      type: object
+      required:
+        - request_id
+        - agent_id
+        - success
+        - execution_time_ms
+        - timestamp
+      properties:
+        request_id:
+          type: string
+          description: Unique request identifier
+        agent_id:
+          type: string
+          description: Agent that processed the request
+        success:
+          type: boolean
+          description: Whether the function call succeeded
+        result:
+          type: object
+          additionalProperties: true
+          description: Function result (if successful)
+        error:
+          type: string
+          description: Error message (if failed)
+        execution_time_ms:
+          type: integer
+          description: Execution time in milliseconds
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+
+    VoiceProcessResponse:
+      type: object
+      required:
+        - transcription
+        - processing_time_ms
+      properties:
+        transcription:
+          type: string
+          description: Transcribed text from audio
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Transcription confidence score
+        language_detected:
+          type: string
+          description: Detected language code
+        processing_time_ms:
+          type: integer
+          description: Processing time in milliseconds
+        agent_response:
+          type: object
+          description: Agent response (if applicable)
+          additionalProperties: true
+
+    HealthCheck:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: API version
+        services:
+          type: object
+          description: Service health status
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [healthy, unhealthy]
+              response_time_ms:
+                type: integer
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: string
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+          description: Request identifier for debugging
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

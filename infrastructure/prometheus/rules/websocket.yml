@@ -1,0 +1,12 @@
+groups:
+  - name: keiko.websocket
+    interval: 30s
+    rules:
+      - alert: WebSocketConnectionHealth
+        expr: rate(keiko_websocket_connection_errors_total[5m]) / clamp_min(rate(keiko_websocket_connection_attempts_total[5m]), 1) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket Verbindungsprobleme"
+          description: "Fehlerrate > 5% in den letzten 5 Minuten"

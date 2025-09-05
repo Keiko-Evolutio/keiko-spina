@@ -1,0 +1,91 @@
+# docker-compose.dev.yml
+# Modular Infrastructure für Keiko Personal Assistant
+# Backend läuft nativ mit 'make dev'
+#
+# Modular structure:
+# - Base services: PostgreSQL, Redis, NATS, MailHog
+# - Monitoring: Prometheus, Grafana, Jaeger, OpenTelemetry
+# - Edge Computing: Registry, Nodes, Load Balancer, Monitor
+# - Workflow: n8n automation platform
+#
+# Logfire-Integration:
+# Das Backend verwendet die Umgebungsvariablen aus .env.logfire_example
+# für die Logfire-Konfiguration. Der OTEL-Collector ist bereits
+# Logfire-kompatibel konfiguriert.
+
+include:
+  # Base Infrastructure Services
+  - infrastructure/docker-compose/base/postgres.yml
+  - infrastructure/docker-compose/base/redis.yml
+  - infrastructure/docker-compose/base/messaging.yml
+  - infrastructure/docker-compose/base/mail.yml
+  
+  # Monitoring and Observability
+  - infrastructure/docker-compose/monitoring/observability.yml
+  - infrastructure/docker-compose/monitoring/grafana.yml
+  - infrastructure/docker-compose/monitoring/jaeger.yml
+  - infrastructure/docker-compose/monitoring/otel.yml
+  
+  # Edge Computing Services
+  - infrastructure/docker-compose/edge/edge-registry.yml
+  - infrastructure/docker-compose/edge/edge-nodes.yml
+  - infrastructure/docker-compose/edge/edge-load-balancer.yml
+  - infrastructure/docker-compose/edge/edge-monitor.yml
+  
+  # Workflow Automation
+  - infrastructure/docker-compose/workflow/n8n.yml
+
+# =============================================================================
+# SHARED CONFIGURATION
+# =============================================================================
+# Networks and volumes are shared across all modular compose files
+
+networks:
+  keiko-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  # Base Service Volumes
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+  redis-data:
+    driver: local
+  redis-insight-data:
+    driver: local
+  nats-data:
+    driver: local
+  mailhog-data:
+    driver: local
+  
+  # Monitoring Volumes
+  prometheus-data:
+    driver: local
+  alertmanager-data:
+    driver: local
+  grafana-data:
+    driver: local
+  
+  # Workflow Volumes
+  n8n-postgres-data:
+    driver: local
+  n8n-data:
+    driver: local
+  
+  # Edge Computing Volumes
+  edge-registry-data:
+    driver: local
+  edge-node-1-cache:
+    driver: local
+  edge-node-2-cache:
+    driver: local
+  edge-node-3-cache:
+    driver: local
+  edge-load-balancer-data:
+    driver: local
+  edge-monitor-data:
+    driver: local

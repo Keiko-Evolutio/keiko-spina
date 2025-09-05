@@ -1,0 +1,410 @@
+name: 'Error Handler'
+description: 'Comprehensive error handling and reporting for GitHub Actions'
+branding:
+  icon: 'alert-triangle'
+  color: 'orange'
+
+inputs:
+  job_name:
+    description: 'Name of the job that failed'
+    required: true
+  step_name:
+    description: 'Name of the step that failed'
+    required: false
+    default: 'Unknown Step'
+  error_message:
+    description: 'Error message or description'
+    required: false
+    default: ''
+  log_file:
+    description: 'Path to log file for analysis'
+    required: false
+    default: ''
+  notification_webhook:
+    description: 'Webhook URL for error notifications'
+    required: false
+    default: ''
+  create_issue:
+    description: 'Create GitHub issue for critical errors'
+    required: false
+    default: 'false'
+  error_category:
+    description: 'Category of error (test, build, deploy, security, etc.)'
+    required: false
+    default: 'unknown'
+
+outputs:
+  error_id:
+    description: 'Unique identifier for this error'
+    value: ${{ steps.analyze.outputs.error_id }}
+  error_category:
+    description: 'Categorized error type'
+    value: ${{ steps.analyze.outputs.error_category }}
+  severity:
+    description: 'Error severity (low, medium, high, critical)'
+    value: ${{ steps.analyze.outputs.severity }}
+  suggested_action:
+    description: 'Suggested action to resolve the error'
+    value: ${{ steps.analyze.outputs.suggested_action }}
+  error_report:
+    description: 'Detailed error report'
+    value: ${{ steps.analyze.outputs.error_report }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🔍 Analyze Error
+      id: analyze
+      shell: bash
+      run: |
+        # Error analysis configuration
+        JOB_NAME="${{ inputs.job_name }}"
+        STEP_NAME="${{ inputs.step_name }}"
+        ERROR_MESSAGE="${{ inputs.error_message }}"
+        LOG_FILE="${{ inputs.log_file }}"
+        ERROR_CATEGORY="${{ inputs.error_category }}"
+        
+        # Generate unique error ID
+        ERROR_ID="err_$(date +%Y%m%d_%H%M%S)_$(echo $RANDOM | md5sum | head -c 8)"
+        
+        echo "🔍 Analyzing error: $ERROR_ID"
+        echo "Job: $JOB_NAME"
+        echo "Step: $STEP_NAME"
+        echo "Category: $ERROR_CATEGORY"
+        echo ""
+        
+        # Initialize analysis variables
+        SEVERITY="medium"
+        SUGGESTED_ACTION="Review logs and retry"
+        DETAILED_CATEGORY="$ERROR_CATEGORY"
+        
+        # Analyze error message and logs
+        analyze_error() {
+          local error_text="$1"
+          local log_content="$2"
+          
+          # Convert to lowercase for pattern matching
+          local error_lower=$(echo "$error_text $log_content" | tr '[:upper:]' '[:lower:]')
+          
+          # Critical errors
+          if echo "$error_lower" | grep -qE "(segmentation fault|core dumped|out of memory|disk.*full|permission denied|authentication.*failed)"; then
+            SEVERITY="critical"
+            DETAILED_CATEGORY="system"
+            SUGGESTED_ACTION="Immediate investigation required - system-level issue"
+          
+          # Security-related errors
+          elif echo "$error_lower" | grep -qE "(security|vulnerability|cve-|unauthorized|forbidden|ssl.*error|certificate.*error)"; then
+            SEVERITY="high"
+            DETAILED_CATEGORY="security"
+            SUGGESTED_ACTION="Security review required - check dependencies and configurations"
+          
+          # Network/connectivity errors
+          elif echo "$error_lower" | grep -qE "(connection.*refused|timeout|network.*error|dns.*error|host.*unreachable|ssl.*handshake)"; then
+            SEVERITY="medium"
+            DETAILED_CATEGORY="network"
+            SUGGESTED_ACTION="Check network connectivity and external service status"
+          
+          # Dependency/package errors
+          elif echo "$error_lower" | grep -qE "(package.*not.*found|import.*error|module.*not.*found|dependency.*error|version.*conflict)"; then
+            SEVERITY="medium"
+            DETAILED_CATEGORY="dependency"
+            SUGGESTED_ACTION="Review and update dependencies - check requirements files"
+          
+          # Test failures
+          elif echo "$error_lower" | grep -qE "(test.*failed|assertion.*error|pytest.*failed|unittest.*failed)"; then
+            SEVERITY="medium"
+            DETAILED_CATEGORY="test"
+            SUGGESTED_ACTION="Review test failures - may indicate code issues or flaky tests"
+          
+          # Build/compilation errors
+          elif echo "$error_lower" | grep -qE "(build.*failed|compilation.*error|syntax.*error|parse.*error)"; then
+            SEVERITY="high"
+            DETAILED_CATEGORY="build"
+            SUGGESTED_ACTION="Fix syntax or compilation errors in code"
+          
+          # Configuration errors
+          elif echo "$error_lower" | grep -qE "(config.*error|configuration.*invalid|missing.*config|yaml.*error|json.*error)"; then
+            SEVERITY="medium"
+            DETAILED_CATEGORY="configuration"
+            SUGGESTED_ACTION="Review and fix configuration files"
+          
+          # Resource/performance errors
+          elif echo "$error_lower" | grep -qE "(resource.*exhausted|memory.*limit|cpu.*limit|quota.*exceeded|rate.*limit)"; then
+            SEVERITY="high"
+            DETAILED_CATEGORY="resource"
+            SUGGESTED_ACTION="Optimize resource usage or increase limits"
+          
+          # Docker/container errors
+          elif echo "$error_lower" | grep -qE "(docker.*error|container.*failed|image.*not.*found|dockerfile.*error)"; then
+            SEVERITY="medium"
+            DETAILED_CATEGORY="container"
+            SUGGESTED_ACTION="Check Docker configuration and image availability"
+          
+          # Database errors
+          elif echo "$error_lower" | grep -qE "(database.*error|sql.*error|connection.*pool|migration.*failed)"; then
+            SEVERITY="high"
+            DETAILED_CATEGORY="database"
+            SUGGESTED_ACTION="Check database connectivity and schema"
+          
+          # Low severity issues
+          elif echo "$error_lower" | grep -qE "(warning|deprecated|skip|ignore)"; then
+            SEVERITY="low"
+            DETAILED_CATEGORY="warning"
+            SUGGESTED_ACTION="Review warnings - may need attention in future"
+          fi
+        }
+        
+        # Collect error information
+        ERROR_TEXT="$ERROR_MESSAGE"
+        LOG_CONTENT=""
+        
+        # Read log file if provided
+        if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
+          echo "📄 Reading log file: $LOG_FILE"
+          LOG_CONTENT=$(tail -n 100 "$LOG_FILE" 2>/dev/null || echo "Could not read log file")
+        fi
+        
+        # Analyze the error
+        analyze_error "$ERROR_TEXT" "$LOG_CONTENT"
+        
+        # Generate error report
+        ERROR_REPORT=$(cat << EOF
+        Error ID: $ERROR_ID
+        Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        Job: $JOB_NAME
+        Step: $STEP_NAME
+        Category: $DETAILED_CATEGORY
+        Severity: $SEVERITY
+        
+        Error Message:
+        $ERROR_MESSAGE
+        
+        Suggested Action:
+        $SUGGESTED_ACTION
+        
+        Environment:
+        - Runner: ${{ runner.os }}
+        - Workflow: ${{ github.workflow }}
+        - Run ID: ${{ github.run_id }}
+        - Commit: ${{ github.sha }}
+        - Branch: ${{ github.ref_name }}
+        - Actor: ${{ github.actor }}
+        EOF
+        )
+        
+        # Add log excerpt if available
+        if [ -n "$LOG_CONTENT" ]; then
+          ERROR_REPORT="$ERROR_REPORT
+        
+        Log Excerpt (last 100 lines):
+        $LOG_CONTENT"
+        fi
+        
+        # Set outputs
+        echo "error_id=$ERROR_ID" >> $GITHUB_OUTPUT
+        echo "error_category=$DETAILED_CATEGORY" >> $GITHUB_OUTPUT
+        echo "severity=$SEVERITY" >> $GITHUB_OUTPUT
+        echo "suggested_action=$SUGGESTED_ACTION" >> $GITHUB_OUTPUT
+        
+        # Handle multiline output for error report
+        {
+          echo "error_report<<EOF"
+          echo "$ERROR_REPORT"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
+        # Create step summary
+        echo "## 🚨 Error Analysis Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Error ID** | \`$ERROR_ID\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Job** | $JOB_NAME |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Step** | $STEP_NAME |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Category** | $DETAILED_CATEGORY |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Severity** | $SEVERITY |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Timestamp** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add severity-specific emoji and styling
+        case "$SEVERITY" in
+          "critical")
+            echo "### 🔴 Critical Error" >> $GITHUB_STEP_SUMMARY
+            echo "> **Immediate attention required!**" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "high")
+            echo "### 🟠 High Severity Error" >> $GITHUB_STEP_SUMMARY
+            echo "> **Requires prompt attention**" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "medium")
+            echo "### 🟡 Medium Severity Error" >> $GITHUB_STEP_SUMMARY
+            echo "> **Should be addressed**" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "low")
+            echo "### 🟢 Low Severity Issue" >> $GITHUB_STEP_SUMMARY
+            echo "> **For future consideration**" >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Suggested Action:** $SUGGESTED_ACTION" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -n "$ERROR_MESSAGE" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Error Details" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$ERROR_MESSAGE" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "✅ Error analysis completed: $ERROR_ID"
+
+    - name: 📧 Send Notification
+      if: inputs.notification_webhook != ''
+      shell: bash
+      run: |
+        WEBHOOK_URL="${{ inputs.notification_webhook }}"
+        ERROR_ID="${{ steps.analyze.outputs.error_id }}"
+        SEVERITY="${{ steps.analyze.outputs.severity }}"
+        CATEGORY="${{ steps.analyze.outputs.error_category }}"
+        
+        if [ -n "$WEBHOOK_URL" ]; then
+          echo "📧 Sending error notification..."
+          
+          # Create notification payload
+          PAYLOAD=$(cat << EOF
+        {
+          "text": "🚨 GitHub Actions Error Alert",
+          "attachments": [
+            {
+              "color": "danger",
+              "fields": [
+                {
+                  "title": "Error ID",
+                  "value": "$ERROR_ID",
+                  "short": true
+                },
+                {
+                  "title": "Severity",
+                  "value": "$SEVERITY",
+                  "short": true
+                },
+                {
+                  "title": "Category",
+                  "value": "$CATEGORY",
+                  "short": true
+                },
+                {
+                  "title": "Job",
+                  "value": "${{ inputs.job_name }}",
+                  "short": true
+                },
+                {
+                  "title": "Workflow",
+                  "value": "${{ github.workflow }}",
+                  "short": true
+                },
+                {
+                  "title": "Branch",
+                  "value": "${{ github.ref_name }}",
+                  "short": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "button",
+                  "text": "View Workflow Run",
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            }
+          ]
+        }
+        EOF
+          )
+          
+          # Send notification
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL" || echo "⚠️ Failed to send notification"
+        fi
+
+    - name: 🐛 Create Issue
+      if: inputs.create_issue == 'true' && steps.analyze.outputs.severity == 'critical'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const errorId = '${{ steps.analyze.outputs.error_id }}';
+          const errorReport = `${{ steps.analyze.outputs.error_report }}`;
+          
+          const issue = await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Critical Error: ${errorId}`,
+            body: `## Critical Error Report
+          
+          This issue was automatically created due to a critical error in the GitHub Actions workflow.
+          
+          \`\`\`
+          ${errorReport}
+          \`\`\`
+          
+          ### Workflow Information
+          - **Run ID**: ${{ github.run_id }}
+          - **Workflow**: ${{ github.workflow }}
+          - **Commit**: ${{ github.sha }}
+          - **Branch**: ${{ github.ref_name }}
+          - **Actor**: ${{ github.actor }}
+          
+          ### Links
+          - [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Commit](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          
+          Please investigate and resolve this critical error as soon as possible.`,
+            labels: ['bug', 'critical', 'ci-cd', 'auto-generated']
+          });
+          
+          console.log(`Created issue #${issue.data.number} for critical error ${errorId}`);
+
+    - name: 📊 Save Error Report
+      shell: bash
+      run: |
+        ERROR_ID="${{ steps.analyze.outputs.error_id }}"
+        ERROR_REPORT="${{ steps.analyze.outputs.error_report }}"
+        
+        # Create error report directory
+        mkdir -p error-reports
+        
+        # Save detailed error report
+        echo "$ERROR_REPORT" > "error-reports/${ERROR_ID}.txt"
+        
+        # Create JSON report for programmatic processing
+        cat << EOF > "error-reports/${ERROR_ID}.json"
+        {
+          "error_id": "$ERROR_ID",
+          "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+          "job_name": "${{ inputs.job_name }}",
+          "step_name": "${{ inputs.step_name }}",
+          "category": "${{ steps.analyze.outputs.error_category }}",
+          "severity": "${{ steps.analyze.outputs.severity }}",
+          "suggested_action": "${{ steps.analyze.outputs.suggested_action }}",
+          "workflow": "${{ github.workflow }}",
+          "run_id": "${{ github.run_id }}",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "actor": "${{ github.actor }}",
+          "error_message": "${{ inputs.error_message }}"
+        }
+        EOF
+        
+        echo "📊 Error report saved: error-reports/${ERROR_ID}.txt"
+        echo "📊 JSON report saved: error-reports/${ERROR_ID}.json"
+
+    - name: 📤 Upload Error Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: error-reports-${{ steps.analyze.outputs.error_id }}
+        path: error-reports/
+        retention-days: 30

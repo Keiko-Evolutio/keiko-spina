@@ -1,0 +1,391 @@
+{
+  "timestamp": "2025-08-13T10:57:15.294247",
+  "project": "keiko-personal-assistant",
+  "test_structure_version": "v2.0_post_migration",
+  "monitoring": {
+    "enabled": true,
+    "dashboards": {
+      "grafana": {
+        "dashboard": {
+          "id": null,
+          "title": "Keiko Test Metrics Dashboard",
+          "tags": [
+            "keiko",
+            "tests",
+            "ci-cd",
+            "migration"
+          ],
+          "timezone": "browser",
+          "schemaVersion": 30,
+          "version": 1,
+          "panels": [
+            {
+              "id": 1,
+              "title": "Test Success Rate by Category",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "(github_actions_test_total{category=\"unit\"} - github_actions_test_failures{category=\"unit\"}) / github_actions_test_total{category=\"unit\"} * 100",
+                  "legendFormat": "Unit Tests",
+                  "refId": "A"
+                },
+                {
+                  "expr": "(github_actions_test_total{category=\"integration\"} - github_actions_test_failures{category=\"integration\"}) / github_actions_test_total{category=\"integration\"} * 100",
+                  "legendFormat": "Integration Tests",
+                  "refId": "B"
+                },
+                {
+                  "expr": "(github_actions_test_total{category=\"e2e\"} - github_actions_test_failures{category=\"e2e\"}) / github_actions_test_total{category=\"e2e\"} * 100",
+                  "legendFormat": "E2E Tests",
+                  "refId": "C"
+                },
+                {
+                  "expr": "(github_actions_test_total{category=\"conformance\"} - github_actions_test_failures{category=\"conformance\"}) / github_actions_test_total{category=\"conformance\"} * 100",
+                  "legendFormat": "Conformance Tests",
+                  "refId": "D"
+                },
+                {
+                  "expr": "(github_actions_test_total{category=\"security\"} - github_actions_test_failures{category=\"security\"}) / github_actions_test_total{category=\"security\"} * 100",
+                  "legendFormat": "Security Tests",
+                  "refId": "E"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "min": 0,
+                  "max": 100,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 85
+                      },
+                      {
+                        "color": "green",
+                        "value": 95
+                      }
+                    ]
+                  }
+                }
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto"
+              }
+            },
+            {
+              "id": 2,
+              "title": "Test Duration Trends",
+              "type": "timeseries",
+              "targets": [
+                {
+                  "expr": "github_actions_test_duration{category=\"unit\"}",
+                  "legendFormat": "Unit Tests",
+                  "refId": "A"
+                },
+                {
+                  "expr": "github_actions_test_duration{category=\"integration\"}",
+                  "legendFormat": "Integration Tests",
+                  "refId": "B"
+                },
+                {
+                  "expr": "github_actions_test_duration{category=\"e2e\"}",
+                  "legendFormat": "E2E Tests",
+                  "refId": "C"
+                },
+                {
+                  "expr": "github_actions_test_duration{category=\"performance\"}",
+                  "legendFormat": "Performance Tests",
+                  "refId": "D"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "fillOpacity": 0.1,
+                    "gradientMode": "none",
+                    "showPoints": "auto",
+                    "pointSize": 5
+                  }
+                }
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "visible",
+                  "placement": "bottom"
+                }
+              }
+            },
+            {
+              "id": 3,
+              "title": "Test Coverage Trends",
+              "type": "timeseries",
+              "targets": [
+                {
+                  "expr": "test_coverage_percentage{category=\"unit\"}",
+                  "legendFormat": "Unit Test Coverage",
+                  "refId": "A"
+                },
+                {
+                  "expr": "test_coverage_percentage{category=\"integration\"}",
+                  "legendFormat": "Integration Test Coverage",
+                  "refId": "B"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "min": 0,
+                  "max": 100,
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 2,
+                    "fillOpacity": 0.2,
+                    "gradientMode": "none"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 70
+                      },
+                      {
+                        "color": "green",
+                        "value": 85
+                      }
+                    ]
+                  }
+                }
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 8
+              }
+            },
+            {
+              "id": 4,
+              "title": "Test Failures by Category (Last 24h)",
+              "type": "barchart",
+              "targets": [
+                {
+                  "expr": "increase(github_actions_test_failures[24h])",
+                  "legendFormat": "{{ category }}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "custom": {
+                    "orientation": "horizontal",
+                    "barWidth": 0.6,
+                    "groupWidth": 0.7
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  }
+                }
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              }
+            },
+            {
+              "id": 5,
+              "title": "Performance Metrics",
+              "type": "timeseries",
+              "targets": [
+                {
+                  "expr": "test_performance_latency_p95",
+                  "legendFormat": "P95 Latency",
+                  "refId": "A"
+                },
+                {
+                  "expr": "test_performance_latency_p99",
+                  "legendFormat": "P99 Latency",
+                  "refId": "B"
+                },
+                {
+                  "expr": "test_performance_throughput",
+                  "legendFormat": "Throughput (req/s)",
+                  "refId": "C"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "ms",
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1
+                  }
+                }
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+              }
+            }
+          ],
+          "time": {
+            "from": "now-24h",
+            "to": "now"
+          },
+          "refresh": "30s",
+          "templating": {
+            "list": []
+          },
+          "annotations": {
+            "list": []
+          }
+        },
+        "overwrite": true
+      }
+    },
+    "alerts": {
+      "prometheus": {
+        "groups": [
+          {
+            "name": "keiko_test_alerts",
+            "interval": "30s",
+            "rules": [
+              {
+                "alert": "UnitTestFailureRateHigh",
+                "expr": "(github_actions_test_failures{category=\"unit\"} / github_actions_test_total{category=\"unit\"}) > 0.05",
+                "for": "5m",
+                "labels": {
+                  "severity": "warning",
+                  "category": "unit",
+                  "team": "keiko-dev"
+                },
+                "annotations": {
+                  "summary": "Unit test failure rate is high",
+                  "description": "Unit test failure rate is {{ $value | humanizePercentage }} for the last 5 minutes",
+                  "runbook_url": "https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#unit-tests"
+                }
+              },
+              {
+                "alert": "SecurityTestFailure",
+                "expr": "github_actions_test_failures{category=\"security\"} > 0",
+                "for": "1m",
+                "labels": {
+                  "severity": "critical",
+                  "category": "security",
+                  "team": "keiko-dev"
+                },
+                "annotations": {
+                  "summary": "Security tests are failing",
+                  "description": "{{ $value }} security tests are failing - immediate attention required",
+                  "runbook_url": "https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#security-tests"
+                }
+              },
+              {
+                "alert": "ConformanceTestFailure",
+                "expr": "github_actions_test_failures{category=\"conformance\"} > 0",
+                "for": "1m",
+                "labels": {
+                  "severity": "critical",
+                  "category": "conformance",
+                  "team": "keiko-dev"
+                },
+                "annotations": {
+                  "summary": "Conformance tests are failing",
+                  "description": "{{ $value }} conformance tests are failing - protocol compliance may be broken",
+                  "runbook_url": "https://github.com/oscharko/keiko-personal-assistant/blob/main/docs/TESTING_GUIDELINES.md#conformance-tests"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "metrics": {
+      "test_categories": [
+        "unit",
+        "integration",
+        "system",
+        "e2e",
+        "conformance",
+        "security",
+        "performance",
+        "sdk"
+      ],
+      "collection_interval": "30s",
+      "retention_period": "30d"
+    },
+    "notifications": {
+      "slack": {
+        "enabled": true,
+        "channel": "#keiko-alerts",
+        "webhook_url_env": "SLACK_WEBHOOK_URL"
+      },
+      "email": {
+        "enabled": false,
+        "recipients": []
+      }
+    }
+  }
+}

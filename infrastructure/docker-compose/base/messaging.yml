@@ -1,0 +1,34 @@
+# NATS Messaging Service
+# Message broker for inter-service communication
+
+services:
+  # NATS Message Broker
+  nats:
+    image: nats:2.10-alpine
+    container_name: keiko-nats
+    command: >
+      --jetstream
+      --store_dir=/data
+      --http_port=8222
+      --port=4222
+      --cluster_name=keiko-cluster
+    volumes:
+      - nats-data:/data
+    ports:
+      - "4222:4222"   # NATS client connections
+      - "6222:6222"   # Cluster routes
+      - "8222:8222"   # HTTP monitoring
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8222/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nats-data:
+    driver: local
+

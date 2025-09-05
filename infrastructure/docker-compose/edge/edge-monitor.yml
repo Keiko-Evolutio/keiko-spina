@@ -1,0 +1,45 @@
+# Edge Monitor Service
+# Monitoring and health checking for edge computing infrastructure
+
+services:
+  # Edge Monitor
+  edge-monitor:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/edge/Dockerfile.edge-monitor
+      target: development
+    image: keiko/edge-monitor:dev
+    container_name: keiko-edge-monitor
+    environment:
+      - PYTHONPATH=/app
+      - EDGE_CONFIG_PATH=/app/config/edge-monitor.yml
+      - ALERT_RULES_PATH=/app/config/alert-rules.yml
+      - LOG_LEVEL=DEBUG
+      - MONITOR_PORT=8080
+      - HEALTH_CHECK_PORT=8081
+      - METRICS_PORT=9090
+      - REGISTRY_URL=http://edge-registry:8080
+      - CHECK_INTERVAL=30
+    volumes:
+      - edge-monitor-data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8090:8080"   # Monitor API
+      - "8091:8081"   # Health check
+      - "9091:9090"   # Metrics endpoint
+    depends_on:
+      - edge-registry
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  edge-monitor-data:
+    driver: local
+

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: "keiko-dashboards"
+    orgId: 1
+    folder: "Keiko"
+    type: file
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

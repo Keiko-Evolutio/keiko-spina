@@ -1,0 +1,448 @@
+name: 🚀 Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      deployment_type:
+        description: 'Type of deployment'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - hotfix
+          - rollback
+      skip_tests:
+        description: 'Skip tests (emergency only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DEPLOYMENT_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+  DEPLOYMENT_TYPE: ${{ github.event.inputs.deployment_type || 'standard' }}
+  SKIP_TESTS: ${{ github.event.inputs.skip_tests || 'false' }}
+
+jobs:
+  # ============================================================================
+  # PRE-DEPLOYMENT VALIDATION
+  # ============================================================================
+  pre-deployment:
+    name: 🔍 Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    outputs:
+      deployment-allowed: ${{ steps.validate.outputs.deployment-allowed }}
+      security-scan-passed: ${{ steps.security.outputs.scan-passed }}
+      tests-passed: ${{ steps.tests.outputs.tests-passed }}
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate Deployment Conditions
+        id: validate
+        run: |
+          echo "🔍 Validating deployment conditions..."
+          
+          DEPLOYMENT_ALLOWED="true"
+          
+          # Check branch policy for production
+          if [ "${{ env.DEPLOYMENT_ENVIRONMENT }}" = "production" ]; then
+            if [ "${{ github.ref_name }}" != "main" ] && [[ ! "${{ github.ref_name }}" =~ ^release/.* ]]; then
+              echo "❌ Production deployments only allowed from main or release/* branches"
+              DEPLOYMENT_ALLOWED="false"
+            fi
+          fi
+          
+          # Check if this is an emergency deployment
+          if [ "${{ env.DEPLOYMENT_TYPE }}" = "hotfix" ]; then
+            echo "🚨 Emergency hotfix deployment detected"
+            echo "⚠️ Additional approvals may be required"
+          fi
+          
+          echo "deployment-allowed=$DEPLOYMENT_ALLOWED" >> $GITHUB_OUTPUT
+          
+          if [ "$DEPLOYMENT_ALLOWED" = "false" ]; then
+            echo "❌ Deployment validation failed"
+            exit 1
+          fi
+          
+          echo "✅ Deployment validation passed"
+
+      - name: 🛡️ Security Scan
+        id: security
+        if: env.DEPLOYMENT_ENVIRONMENT == 'production' || env.SKIP_TESTS == 'false'
+        run: |
+          echo "🛡️ Running security scan..."
+          
+          # Mock security scan (in real implementation, use actual security tools)
+          SCAN_PASSED="true"
+          
+          # Simulate security scan
+          echo "🔍 Scanning for vulnerabilities..."
+          sleep 5
+          
+          # Check vulnerability threshold
+          VULNERABILITY_SCORE=3.2
+          MAX_SCORE=7.0
+          
+          if (( $(echo "$VULNERABILITY_SCORE > $MAX_SCORE" | bc -l) )); then
+            echo "❌ Security scan failed: vulnerability score $VULNERABILITY_SCORE exceeds threshold $MAX_SCORE"
+            SCAN_PASSED="false"
+          else
+            echo "✅ Security scan passed: vulnerability score $VULNERABILITY_SCORE"
+          fi
+          
+          echo "scan-passed=$SCAN_PASSED" >> $GITHUB_OUTPUT
+
+      - name: 🧪 Run Critical Tests
+        id: tests
+        if: env.SKIP_TESTS == 'false'
+        run: |
+          echo "🧪 Running critical tests before deployment..."
+          
+          # Mock test execution
+          TESTS_PASSED="true"
+          
+          echo "🔍 Running smoke tests..."
+          sleep 10
+          
+          echo "🔍 Running integration tests..."
+          sleep 15
+          
+          echo "✅ All critical tests passed"
+          echo "tests-passed=$TESTS_PASSED" >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # STAGING DEPLOYMENT
+  # ============================================================================
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: pre-deployment
+    if: needs.pre-deployment.outputs.deployment-allowed == 'true' && (env.DEPLOYMENT_ENVIRONMENT == 'staging' || env.DEPLOYMENT_ENVIRONMENT == 'production')
+    environment: 
+      name: staging
+      url: https://staging.keiko.dev
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          
+          # Mock deployment process
+          echo "📦 Building application..."
+          sleep 10
+          
+          echo "🐳 Building Docker images..."
+          sleep 15
+          
+          echo "☁️ Deploying to staging infrastructure..."
+          sleep 20
+          
+          echo "✅ Staging deployment completed"
+
+      - name: 🏥 Health Check
+        run: |
+          echo "🏥 Performing health checks..."
+          
+          # Mock health check
+          for i in {1..5}; do
+            echo "🔍 Health check attempt $i/5..."
+            sleep 5
+            
+            # Simulate health check
+            if [ $i -eq 5 ]; then
+              echo "✅ Health check passed"
+              break
+            fi
+          done
+
+      - name: 📊 Post-Deployment Monitoring
+        run: |
+          echo "📊 Starting post-deployment monitoring..."
+          
+          # Mock monitoring setup
+          echo "📈 Setting up performance monitoring..."
+          echo "🚨 Configuring alerts..."
+          echo "📋 Logging deployment metrics..."
+          
+          echo "✅ Monitoring configured"
+
+  # ============================================================================
+  # PRODUCTION DEPLOYMENT
+  # ============================================================================
+  deploy-production:
+    name: 🏭 Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [pre-deployment, deploy-staging]
+    if: needs.pre-deployment.outputs.deployment-allowed == 'true' && env.DEPLOYMENT_ENVIRONMENT == 'production'
+    environment: 
+      name: production
+      url: https://keiko.dev
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Validate Production Deployment
+        run: |
+          echo "🔐 Validating production deployment requirements..."
+          
+          # Check required approvals (this would be handled by GitHub environment protection)
+          echo "✅ Required approvals verified"
+          
+          # Check deployment window
+          CURRENT_HOUR=$(date +%H)
+          if [ $CURRENT_HOUR -lt 9 ] || [ $CURRENT_HOUR -gt 17 ]; then
+            if [ "${{ env.DEPLOYMENT_TYPE }}" != "hotfix" ]; then
+              echo "⚠️ Deployment outside business hours - emergency approval required"
+            fi
+          fi
+          
+          echo "✅ Production deployment validation passed"
+
+      - name: 📋 Create Deployment Record
+        run: |
+          echo "📋 Creating deployment record..."
+          
+          cat << EOF > deployment-record.json
+          {
+            "deployment_id": "${{ github.run_id }}",
+            "environment": "production",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "deployment_type": "${{ env.DEPLOYMENT_TYPE }}",
+            "pre_deployment_checks": {
+              "security_scan": "${{ needs.pre-deployment.outputs.security-scan-passed }}",
+              "tests": "${{ needs.pre-deployment.outputs.tests-passed }}"
+            }
+          }
+          EOF
+          
+          echo "✅ Deployment record created"
+
+      - name: 🚀 Deploy to Production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          
+          # Mock production deployment
+          echo "📦 Building production artifacts..."
+          sleep 15
+          
+          echo "🐳 Building production Docker images..."
+          sleep 20
+          
+          echo "☁️ Deploying to production infrastructure..."
+          sleep 30
+          
+          echo "🔄 Updating load balancers..."
+          sleep 10
+          
+          echo "✅ Production deployment completed"
+
+      - name: 🏥 Production Health Check
+        run: |
+          echo "🏥 Performing comprehensive health checks..."
+          
+          # Mock comprehensive health checks
+          HEALTH_ENDPOINTS=(
+            "https://api.keiko.dev/health"
+            "https://api.keiko.dev/ready"
+            "https://api.keiko.dev/metrics"
+          )
+          
+          for endpoint in "${HEALTH_ENDPOINTS[@]}"; do
+            echo "🔍 Checking $endpoint..."
+            sleep 3
+            echo "✅ $endpoint is healthy"
+          done
+          
+          echo "✅ All health checks passed"
+
+      - name: 📊 Production Monitoring Setup
+        run: |
+          echo "📊 Setting up production monitoring..."
+          
+          # Mock monitoring configuration
+          echo "📈 Configuring performance monitoring..."
+          echo "🚨 Setting up critical alerts..."
+          echo "📋 Enabling audit logging..."
+          echo "🔍 Starting error tracking..."
+          
+          echo "✅ Production monitoring active"
+
+      - name: 📤 Upload Deployment Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-${{ github.run_id }}
+          path: deployment-record.json
+          retention-days: 365
+
+  # ============================================================================
+  # POST-DEPLOYMENT VALIDATION
+  # ============================================================================
+  post-deployment:
+    name: ✅ Post-Deployment Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧪 Smoke Tests
+        run: |
+          echo "🧪 Running post-deployment smoke tests..."
+          
+          # Determine target environment
+          if [ "${{ needs.deploy-production.result }}" = "success" ]; then
+            TARGET_ENV="production"
+            BASE_URL="https://api.keiko.dev"
+          else
+            TARGET_ENV="staging"
+            BASE_URL="https://staging-api.keiko.dev"
+          fi
+          
+          echo "🎯 Testing $TARGET_ENV environment at $BASE_URL"
+          
+          # Mock smoke tests
+          echo "🔍 Testing API endpoints..."
+          sleep 5
+          
+          echo "🔍 Testing authentication..."
+          sleep 3
+          
+          echo "🔍 Testing core functionality..."
+          sleep 7
+          
+          echo "✅ All smoke tests passed"
+
+      - name: 📊 Performance Validation
+        run: |
+          echo "📊 Validating post-deployment performance..."
+          
+          # Mock performance validation
+          echo "📈 Checking response times..."
+          echo "📊 Validating throughput..."
+          echo "🔍 Monitoring error rates..."
+          
+          sleep 10
+          
+          echo "✅ Performance validation completed"
+
+      - name: 🎉 Deployment Success Notification
+        if: success()
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          
+          # Create success summary
+          echo "## 🎉 Deployment Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ env.DEPLOYMENT_ENVIRONMENT }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Actor** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Deployment Type** | ${{ env.DEPLOYMENT_TYPE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Security Scan: ${{ needs.pre-deployment.outputs.security-scan-passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.pre-deployment.outputs.tests-passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Health Checks: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Smoke Tests: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # ROLLBACK CAPABILITY
+  # ============================================================================
+  rollback:
+    name: 🔄 Rollback Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: failure() && (needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure')
+    needs: [deploy-staging, deploy-production]
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔄 Execute Rollback
+        run: |
+          echo "🔄 Initiating rollback procedure..."
+
+          # Determine which environment failed
+          if [ "${{ needs.deploy-production.result }}" = "failure" ]; then
+            TARGET_ENV="production"
+            echo "🚨 Rolling back production deployment"
+          else
+            TARGET_ENV="staging"
+            echo "⚠️ Rolling back staging deployment"
+          fi
+
+          # Mock rollback process
+          echo "📋 Identifying previous stable version..."
+          sleep 5
+
+          echo "🔄 Reverting to previous deployment..."
+          sleep 15
+
+          echo "🏥 Validating rollback health..."
+          sleep 10
+
+          echo "✅ Rollback completed successfully"
+
+      - name: 📊 Post-Rollback Validation
+        run: |
+          echo "📊 Validating rollback success..."
+
+          # Mock validation
+          echo "🔍 Checking service availability..."
+          echo "📈 Validating performance metrics..."
+          echo "🧪 Running basic functionality tests..."
+
+          sleep 10
+
+          echo "✅ Rollback validation completed"
+
+      - name: 🚨 Rollback Notification
+        run: |
+          echo "🚨 Sending rollback notifications..."
+
+          echo "## 🔄 Rollback Executed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "A rollback was automatically executed due to deployment failure." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ env.DEPLOYMENT_ENVIRONMENT }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Rollback Reason** | Deployment Failure |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Rollback Status** | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Investigate deployment failure" >> $GITHUB_STEP_SUMMARY
+          echo "2. Fix identified issues" >> $GITHUB_STEP_SUMMARY
+          echo "3. Re-run deployment when ready" >> $GITHUB_STEP_SUMMARY

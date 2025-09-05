@@ -1,0 +1,50 @@
+# Edge Registry Service
+# Central registry for edge computing nodes
+
+services:
+  # Edge Registry - Central registry for edge nodes
+  edge-registry:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/edge/Dockerfile.edge-registry
+      target: development
+    image: keiko/edge-registry:dev
+    container_name: keiko-edge-registry
+    environment:
+      - PYTHONPATH=/app
+      - EDGE_CONFIG_PATH=/app/config/edge-registry.yml
+      - LOG_LEVEL=DEBUG
+      - REGISTRY_PORT=8080
+      - REGISTRY_HOST=0.0.0.0
+      - HEALTH_CHECK_PORT=8081
+      - EDGE_NETWORK=keiko-edge-network
+      - POSTGRES_URL=postgresql://keiko_user:keiko_password@postgres:5432/keiko_db
+      - REDIS_URL=redis://redis:6379/0
+      - NATS_URL=nats://nats:4222
+      - POSTGRES_URL=postgresql://keiko_user:keiko_password@postgres:5432/keiko_db
+      - REDIS_URL=redis://redis:6379/0
+      - NATS_URL=nats://nats:4222
+    volumes:
+      - edge-registry-data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8080:8080"   # Registry API
+      - "8081:8081"   # Health check
+    networks:
+      - keiko-network
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  edge-registry-data:
+    driver: local
+

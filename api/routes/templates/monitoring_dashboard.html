@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Keiko Voice System Monitoring</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-healthy { color: #28a745; }
+        .status-warning { color: #ffc107; }
+        .status-error { color: #dc3545; }
+        .status-critical { color: #721c24; }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .alert {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .alert-error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .alert-critical {
+            background: #f5c6cb;
+            border-left: 4px solid #721c24;
+        }
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Keiko Voice System Monitoring</h1>
+
+        <div class="card">
+            <h2>System Status</h2>
+            <div id="system-status">Loading...</div>
+            <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+        </div>
+
+        <div class="card">
+            <h2>Real-time Metrics</h2>
+            <div id="metrics" class="metrics-grid">Loading...</div>
+        </div>
+
+        <div class="card">
+            <h2>Active Alerts</h2>
+            <div id="alerts">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(`/api/voice/monitoring/${endpoint}`);
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+        async function refreshData() {
+            // Update system status
+            const status = await fetchData('status');
+            if (status) {
+                document.getElementById('system-status').innerHTML = `
+                    <p><strong>Overall Health:</strong> <span class="status-${status.overall_health}">${status.overall_health.toUpperCase()}</span></p>
+                    <p><strong>Uptime:</strong> ${Math.floor(status.uptime_seconds / 3600)}h ${Math.floor((status.uptime_seconds % 3600) / 60)}m</p>
+                    <p><strong>Last Check:</strong> ${new Date(status.last_health_check).toLocaleString()}</p>
+                `;
+            }
+
+            // Update metrics
+            const metrics = await fetchData('metrics');
+            if (metrics) {
+                document.getElementById('metrics').innerHTML = `
+                    <div class="metric">
+                        <div class="metric-value">${metrics.active_connections}</div>
+                        <div class="metric-label">Active Connections</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${metrics.total_sessions_today}</div>
+                        <div class="metric-label">Sessions Today</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${(metrics.error_rate * 100).toFixed(1)}%</div>
+                        <div class="metric-label">Error Rate</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${(metrics.recovery_success_rate * 100).toFixed(1)}%</div>
+                        <div class="metric-label">Recovery Rate</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${metrics.azure_api_latency.toFixed(0)}ms</div>
+                        <div class="metric-label">Azure Latency</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${metrics.websocket_latency.toFixed(0)}ms</div>
+                        <div class="metric-label">WebSocket Latency</div>
+                    </div>
+                `;
+            }
+
+            // Update alerts
+            const alerts = await fetchData('alerts');
+            if (alerts && alerts.alerts) {
+                if (alerts.alerts.length === 0) {
+                    document.getElementById('alerts').innerHTML = '<p>✅ No active alerts</p>';
+                } else {
+                    document.getElementById('alerts').innerHTML = alerts.alerts.map(alert => `
+                        <div class="alert alert-${alert.level}">
+                            <strong>${alert.level.toUpperCase()}:</strong> ${alert.message}
+                            <br><small>${alert.component} - ${new Date(alert.timestamp).toLocaleString()}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        // Initial load and auto-refresh
+        refreshData();
+        setInterval(refreshData, 10000); // Refresh every 10 seconds
+    </script>
+</body>
+</html>

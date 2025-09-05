@@ -1,0 +1,288 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Keiko Architecture Compliance Dashboard",
+    "tags": ["keiko", "architecture", "compliance"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall Compliance Score",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_architecture_compliance_score",
+            "legendFormat": "Compliance Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Deployment Independence Score",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_deployment_independence_score",
+            "legendFormat": "Independence Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Active Compliance Alerts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(keiko_active_compliance_alerts)",
+            "legendFormat": "Active Alerts"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 3}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Cross-Imports Detected",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "keiko_cross_imports_total",
+            "legendFormat": "Cross-Imports"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Compliance Score Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "keiko_architecture_compliance_score",
+            "legendFormat": "Overall Compliance"
+          },
+          {
+            "expr": "keiko_deployment_independence_score",
+            "legendFormat": "Deployment Independence"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Compliance Check Duration",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(keiko_compliance_check_duration_seconds_sum[5m]) / rate(keiko_compliance_check_duration_seconds_count[5m])",
+            "legendFormat": "{{check_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "Violations by Type",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "keiko_cross_imports_total",
+            "legendFormat": "Cross-Imports"
+          },
+          {
+            "expr": "keiko_api_contract_violations_total",
+            "legendFormat": "API Contract Violations"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Alert Severity Distribution",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "keiko_active_compliance_alerts",
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 3}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Compliance Status Matrix",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "keiko_architecture_compliance_score",
+            "legendFormat": "Overall Compliance",
+            "format": "table"
+          },
+          {
+            "expr": "keiko_deployment_independence_score",
+            "legendFormat": "Deployment Independence",
+            "format": "table"
+          },
+          {
+            "expr": "keiko_cross_imports_total",
+            "legendFormat": "Cross-Imports",
+            "format": "table"
+          },
+          {
+            "expr": "keiko_api_contract_violations_total",
+            "legendFormat": "API Violations",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Cross-Imports"},
+              "properties": [
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "steps": [
+                      {"color": "green", "value": 0},
+                      {"color": "red", "value": 1}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}
+      },
+      {
+        "id": 10,
+        "title": "Recent Compliance Events",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{job=\"keiko-compliance-monitor\"}",
+            "legendFormat": ""
+          }
+        ],
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "time_range",
+          "type": "interval",
+          "options": [
+            {"text": "5m", "value": "5m"},
+            {"text": "15m", "value": "15m"},
+            {"text": "1h", "value": "1h"},
+            {"text": "6h", "value": "6h"},
+            {"text": "24h", "value": "24h"}
+          ],
+          "current": {"text": "1h", "value": "1h"}
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Compliance Violations",
+          "datasource": "prometheus",
+          "expr": "changes(keiko_cross_imports_total[1h]) > 0 or changes(keiko_api_contract_violations_total[1h]) > 0",
+          "titleFormat": "Compliance Violation",
+          "textFormat": "New violation detected",
+          "iconColor": "red"
+        },
+        {
+          "name": "Deployments",
+          "datasource": "prometheus", 
+          "expr": "changes(keiko_architecture_compliance_score[5m]) > 10",
+          "titleFormat": "Significant Compliance Change",
+          "textFormat": "Compliance score changed significantly",
+          "iconColor": "blue"
+        }
+      ]
+    }
+  }
+}

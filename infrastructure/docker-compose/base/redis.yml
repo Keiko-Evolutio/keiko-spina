@@ -1,0 +1,55 @@
+# Redis Cache Services
+# Includes Redis cache and Redis Insight management interface
+
+services:
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: keiko-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Redis Insight - Redis Management Interface
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: keiko-redis-insight
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    volumes:
+      - redis-insight-data:/data
+    ports:
+      - "8002:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - keiko-network
+    restart: unless-stopped
+    profiles:
+      - tools
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5540/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  redis-data:
+    driver: local
+  redis-insight-data:
+    driver: local
+

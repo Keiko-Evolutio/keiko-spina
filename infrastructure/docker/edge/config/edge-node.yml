@@ -1,0 +1,321 @@
+# Edge Node Configuration - Development
+# Konfiguration für Edge Processing-Nodes
+
+# =============================================================================
+# Node Configuration
+# =============================================================================
+node:
+  id: "${NODE_ID}"
+  type: "${NODE_TYPE}"
+  region: "${NODE_REGION}"
+  version: "1.0.0"
+  environment: "development"
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+server:
+  host: "0.0.0.0"
+  port: 8080
+  health_port: 8081
+  workers: 2
+  max_connections: 100
+  keepalive_timeout: 65
+  request_timeout: 30
+
+# =============================================================================
+# Registry Configuration
+# =============================================================================
+registry:
+  url: "${REGISTRY_URL}"
+  registration:
+    auto_register: true
+    retry_attempts: 5
+    retry_delay_seconds: 5
+    heartbeat_interval_seconds: 30
+    
+  health_reporting:
+    enabled: true
+    report_interval_seconds: 60
+    include_detailed_metrics: true
+
+# =============================================================================
+# Processing Configuration
+# =============================================================================
+processing:
+  # Task Management
+  tasks:
+    max_concurrent: "${MAX_CONCURRENT_TASKS}"
+    queue_size: 1000
+    timeout_seconds: 30
+    retry_attempts: 3
+    
+  # Audio Processing (für audio-processor nodes)
+  audio:
+    sample_rate: 48000
+    channels: 1
+    buffer_size: 1024
+    supported_formats: ["float32", "int16", "int32"]
+    
+    # Voice Activity Detection
+    vad:
+      enabled: true
+      threshold: 0.01
+      frame_duration_ms: 30
+      
+    # Noise Reduction
+    noise_reduction:
+      enabled: true
+      strength: 0.8
+      spectral_subtraction: true
+      
+    # Audio Enhancement
+    enhancement:
+      enabled: true
+      gain_control: true
+      dynamic_range_compression: true
+      equalizer: true
+      
+  # AI Inference (für ai-inference nodes)
+  ai_inference:
+    # Model Loading
+    models:
+      auto_load: true
+      lazy_loading: true
+      preload_popular: true
+      
+    # Inference Engine
+    engine:
+      backend: "onnx"  # onnx, pytorch, tensorflow
+      device: "cpu"    # cpu, cuda, mps
+      optimization_level: "all"
+      
+    # Batch Processing
+    batching:
+      enabled: true
+      max_batch_size: 8
+      timeout_ms: 100
+
+# =============================================================================
+# Models Configuration
+# =============================================================================
+models:
+  path: "${MODELS_PATH}"
+  
+  # Model Registry
+  registry:
+    auto_discover: true
+    supported_formats: [".onnx", ".pt", ".pkl", ".joblib"]
+    
+  # Model Loading
+  loading:
+    lazy_loading: true
+    preload_on_startup: false
+    memory_mapping: true
+    
+  # Model Caching
+  caching:
+    enabled: true
+    max_memory_mb: 512
+    eviction_policy: "lru"
+    
+  # Available Models (wird von SUPPORTED_MODELS überschrieben)
+  available:
+    vad:
+      - name: "vad-v1"
+        path: "vad/vad-v1.onnx"
+        capabilities: ["voice-activity-detection"]
+        expected_latency_ms: 15
+        
+    noise_reduction:
+      - name: "noise-reduction-v2"
+        path: "noise-reduction/nr-v2.onnx"
+        capabilities: ["noise-reduction"]
+        expected_latency_ms: 25
+        
+    enhancement:
+      - name: "enhancement-v1"
+        path: "enhancement/enh-v1.onnx"
+        capabilities: ["audio-enhancement"]
+        expected_latency_ms: 30
+        
+    speaker_id:
+      - name: "speaker-id-v1"
+        path: "speaker-id/sid-v1.onnx"
+        capabilities: ["speaker-identification"]
+        expected_latency_ms: 50
+        
+    emotion:
+      - name: "emotion-v2"
+        path: "emotion/emotion-v2.onnx"
+        capabilities: ["emotion-detection"]
+        expected_latency_ms: 40
+
+# =============================================================================
+# Cache Configuration
+# =============================================================================
+cache:
+  path: "${CACHE_PATH}"
+  size_mb: "${CACHE_SIZE_MB}"
+  
+  # Cache Policies
+  policies:
+    model_cache:
+      enabled: true
+      max_size_mb: 256
+      ttl_hours: 24
+      eviction: "lru"
+      
+    result_cache:
+      enabled: true
+      max_size_mb: 128
+      ttl_minutes: 60
+      eviction: "lru"
+      
+    metadata_cache:
+      enabled: true
+      max_size_mb: 32
+      ttl_minutes: 30
+      eviction: "lru"
+      
+  # Cache Optimization
+  optimization:
+    compression: true
+    deduplication: true
+    prefetching: true
+    background_cleanup: true
+
+# =============================================================================
+# Performance Configuration
+# =============================================================================
+performance:
+  # Resource Limits
+  resources:
+    max_cpu_percent: 80
+    max_memory_percent: 85
+    max_disk_percent: 90
+    
+  # Performance Monitoring
+  monitoring:
+    enabled: true
+    collection_interval_seconds: 10
+    metrics_retention_hours: 24
+    
+    # Metrics to Collect
+    metrics:
+      - "cpu_usage"
+      - "memory_usage"
+      - "disk_usage"
+      - "network_io"
+      - "task_latency"
+      - "task_throughput"
+      - "cache_hit_rate"
+      - "model_load_time"
+      
+  # Performance Optimization
+  optimization:
+    auto_scaling: true
+    load_shedding: true
+    priority_queuing: true
+    adaptive_batching: true
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Authentication
+  authentication:
+    enabled: false  # Disabled for development
+    api_key: "${API_KEY:-dev-key}"
+    
+  # Sandboxing
+  sandboxing:
+    enabled: true
+    restrict_file_access: true
+    restrict_network_access: false  # Needs registry access
+    memory_limit_mb: 1024
+    
+  # Input Validation
+  input_validation:
+    enabled: true
+    max_input_size_mb: 10
+    allowed_mime_types: ["audio/wav", "audio/mp3", "audio/flac", "application/octet-stream"]
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "DEBUG"
+  format: "json"
+  
+  # Log Destinations
+  destinations:
+    console:
+      enabled: true
+      level: "DEBUG"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "/app/logs/edge-node-${NODE_ID}.log"
+      max_size_mb: 50
+      backup_count: 3
+      
+  # Performance Logging
+  performance:
+    enabled: true
+    log_slow_requests: true
+    slow_request_threshold_ms: 100
+
+# =============================================================================
+# OpenTelemetry Configuration
+# =============================================================================
+telemetry:
+  enabled: true
+  service_name: "edge-node-${NODE_ID}"
+  service_version: "1.0.0"
+  
+  # Tracing
+  tracing:
+    enabled: true
+    sampler: "always_on"
+    exporter: "otlp"
+    endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+    
+  # Custom Attributes
+  resource_attributes:
+    node.id: "${NODE_ID}"
+    node.type: "${NODE_TYPE}"
+    node.region: "${NODE_REGION}"
+
+# =============================================================================
+# Development Configuration
+# =============================================================================
+development:
+  # Debug Features
+  debug:
+    enabled: true
+    detailed_errors: true
+    include_stack_traces: true
+    profile_requests: true
+    
+  # Mock Data
+  mock_data:
+    enabled: true
+    generate_test_audio: true
+    simulate_processing_delay: false
+    
+  # Development Tools
+  tools:
+    auto_reload: true
+    debug_endpoints: true
+    performance_profiler: true
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+features:
+  advanced_audio_processing: true
+  gpu_acceleration: false  # Disabled for development
+  model_quantization: false
+  distributed_inference: true
+  real_time_optimization: true

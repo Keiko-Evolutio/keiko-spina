@@ -1,0 +1,277 @@
+# Keiko Personal Assistant - Startup Failure Alert Rules
+# Prometheus Alert Rules für Startup-Orchestrierung und Infrastructure Health
+
+groups:
+  - name: keiko.startup.alerts
+    interval: 30s
+    rules:
+      # =======================================================================
+      # STARTUP ORCHESTRATION ALERTS
+      # =======================================================================
+      
+      - alert: StartupOrchestrationTimeout
+        expr: |
+          (
+            time() - keiko_startup_orchestration_start_time > 1800
+          ) and (
+            keiko_startup_orchestration_status != 2
+          )
+        for: 0m
+        labels:
+          severity: critical
+          component: startup-orchestrator
+          team: infrastructure
+        annotations:
+          summary: "Keiko Startup Orchestration Timeout"
+          description: |
+            Die Startup-Orchestrierung für Keiko Personal Assistant hat das Timeout von 30 Minuten überschritten.
+            
+            Aktueller Status: {{ $labels.status }}
+            Gestartete Services: {{ $value }}
+            
+            Mögliche Ursachen:
+            - Container-Images können nicht heruntergeladen werden
+            - Ressourcenmangel (CPU/Memory/Disk)
+            - Netzwerkprobleme
+            - Konfigurationsfehler
+          runbook_url: "https://docs.keiko.dev/runbooks/startup-timeout"
+
+      - alert: StartupOrchestrationFailed
+        expr: keiko_startup_orchestration_status == 3
+        for: 0m
+        labels:
+          severity: critical
+          component: startup-orchestrator
+          team: infrastructure
+        annotations:
+          summary: "Keiko Startup Orchestration Failed"
+          description: |
+            Die Startup-Orchestrierung für Keiko Personal Assistant ist fehlgeschlagen.
+            
+            Fehlgeschlagene Services: {{ $labels.failed_services }}
+            Fehlergrund: {{ $labels.error_reason }}
+            
+            Sofortige Maßnahmen erforderlich!
+          runbook_url: "https://docs.keiko.dev/runbooks/startup-failed"
+
+      - alert: StartupServiceHealthCheckFailed
+        expr: |
+          keiko_service_health_check_status == 0
+          and
+          keiko_service_required_for_startup == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: "{{ $labels.service_name }}"
+          category: "{{ $labels.service_category }}"
+          team: infrastructure
+        annotations:
+          summary: "Required Service Health Check Failed"
+          description: |
+            Ein für den Startup erforderlicher Service ist nicht gesund.
+            
+            Service: {{ $labels.service_name }}
+            Kategorie: {{ $labels.service_category }}
+            Container: {{ $labels.container_name }}
+            
+            Dies kann den Startup-Prozess blockieren.
+          runbook_url: "https://docs.keiko.dev/runbooks/service-health-failed"
+
+      # =======================================================================
+      # INFRASTRUCTURE DEPENDENCY ALERTS
+      # =======================================================================
+
+      - alert: PostgreSQLStartupFailure
+        expr: |
+          keiko_service_health_check_status{service_name="postgres"} == 0
+          and
+          keiko_startup_orchestration_status < 2
+        for: 5m
+        labels:
+          severity: critical
+          component: postgresql
+          team: infrastructure
+        annotations:
+          summary: "PostgreSQL Startup Failure"
+          description: |
+            PostgreSQL konnte während des Startup-Prozesses nicht gestartet werden.
+            
+            Dies ist ein kritischer Fehler, da PostgreSQL für das Backend erforderlich ist.
+            
+            Prüfen Sie:
+            - Container-Logs: docker logs keiko-postgres
+            - Disk Space für PostgreSQL-Daten
+            - Netzwerk-Konnektivität
+          runbook_url: "https://docs.keiko.dev/runbooks/postgresql-startup-failure"
+
+      - alert: RedisStartupFailure
+        expr: |
+          keiko_service_health_check_status{service_name="redis"} == 0
+          and
+          keiko_startup_orchestration_status < 2
+        for: 5m
+        labels:
+          severity: critical
+          component: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis Startup Failure"
+          description: |
+            Redis konnte während des Startup-Prozesses nicht gestartet werden.
+            
+            Dies blockiert das Backend, da Redis für Caching und Session-Management erforderlich ist.
+          runbook_url: "https://docs.keiko.dev/runbooks/redis-startup-failure"
+
+      - alert: PrometheusStartupFailure
+        expr: |
+          keiko_service_health_check_status{service_name="prometheus"} == 0
+          and
+          keiko_startup_orchestration_status < 2
+        for: 5m
+        labels:
+          severity: warning
+          component: prometheus
+          team: infrastructure
+        annotations:
+          summary: "Prometheus Startup Failure"
+          description: |
+            Prometheus konnte während des Startup-Prozesses nicht gestartet werden.
+            
+            Dies beeinträchtigt das Monitoring und die Observability.
+          runbook_url: "https://docs.keiko.dev/runbooks/prometheus-startup-failure"
+
+      # =======================================================================
+      # BACKEND DEPENDENCY ALERTS
+      # =======================================================================
+
+      - alert: BackendStartupDependencyFailure
+        expr: |
+          keiko_backend_startup_dependency_check_failed == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: backend
+          team: backend
+        annotations:
+          summary: "Backend Startup Dependency Check Failed"
+          description: |
+            Das Backend konnte nicht gestartet werden, da erforderliche Infrastructure-Dependencies nicht verfügbar sind.
+            
+            Fehlgeschlagene Dependencies: {{ $labels.failed_dependencies }}
+            
+            Das Backend wird erst gestartet, wenn alle Dependencies verfügbar sind.
+          runbook_url: "https://docs.keiko.dev/runbooks/backend-dependency-failure"
+
+      - alert: BackendStartupTimeout
+        expr: |
+          (
+            time() - keiko_backend_startup_start_time > 300
+          ) and (
+            keiko_backend_startup_status != 2
+          )
+        for: 0m
+        labels:
+          severity: critical
+          component: backend
+          team: backend
+        annotations:
+          summary: "Backend Startup Timeout"
+          description: |
+            Das Backend hat das Startup-Timeout von 5 Minuten überschritten.
+            
+            Aktueller Status: {{ $labels.status }}
+            
+            Prüfen Sie die Backend-Logs für Details.
+          runbook_url: "https://docs.keiko.dev/runbooks/backend-startup-timeout"
+
+      # =======================================================================
+      # EDGE COMPUTING ALERTS
+      # =======================================================================
+
+      - alert: EdgeServicesStartupDegraded
+        expr: |
+          (
+            count(keiko_service_health_check_status{service_category="edge"} == 0) 
+            / 
+            count(keiko_service_health_check_status{service_category="edge"})
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: edge-computing
+          team: edge
+        annotations:
+          summary: "Edge Services Startup Degraded"
+          description: |
+            Mehr als 50% der Edge Computing Services sind während des Startups fehlgeschlagen.
+            
+            Verfügbare Edge Services: {{ $value }}%
+            
+            Edge Computing Funktionalität ist eingeschränkt.
+          runbook_url: "https://docs.keiko.dev/runbooks/edge-startup-degraded"
+
+      # =======================================================================
+      # RECOVERY ALERTS
+      # =======================================================================
+
+      - alert: StartupOrchestrationRecovered
+        expr: |
+          keiko_startup_orchestration_status == 2
+          and
+          keiko_startup_orchestration_status offset 5m != 2
+        for: 0m
+        labels:
+          severity: info
+          component: startup-orchestrator
+          team: infrastructure
+        annotations:
+          summary: "Startup Orchestration Recovered"
+          description: |
+            Die Startup-Orchestrierung wurde erfolgreich abgeschlossen.
+            
+            Alle erforderlichen Services sind jetzt verfügbar.
+            Startup-Dauer: {{ $labels.startup_duration }}s
+          runbook_url: "https://docs.keiko.dev/runbooks/startup-recovered"
+
+  # =========================================================================
+  # STARTUP PERFORMANCE MONITORING
+  # =========================================================================
+  
+  - name: keiko.startup.performance
+    interval: 60s
+    rules:
+      - alert: StartupPerformanceDegraded
+        expr: |
+          keiko_startup_orchestration_duration_seconds > 1200
+        for: 0m
+        labels:
+          severity: warning
+          component: startup-orchestrator
+          team: infrastructure
+        annotations:
+          summary: "Startup Performance Degraded"
+          description: |
+            Der Startup-Prozess dauert länger als erwartet (> 20 Minuten).
+            
+            Aktuelle Dauer: {{ $value }}s
+            
+            Dies kann auf Performance-Probleme hinweisen.
+          runbook_url: "https://docs.keiko.dev/runbooks/startup-performance"
+
+      - alert: FrequentStartupFailures
+        expr: |
+          increase(keiko_startup_orchestration_failures_total[1h]) > 3
+        for: 0m
+        labels:
+          severity: critical
+          component: startup-orchestrator
+          team: infrastructure
+        annotations:
+          summary: "Frequent Startup Failures Detected"
+          description: |
+            Es wurden mehr als 3 Startup-Fehler in der letzten Stunde erkannt.
+            
+            Anzahl Fehler: {{ $value }}
+            
+            Dies deutet auf ein systematisches Problem hin.
+          runbook_url: "https://docs.keiko.dev/runbooks/frequent-startup-failures"

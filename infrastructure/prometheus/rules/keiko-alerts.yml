@@ -1,0 +1,445 @@
+# prometheus/rules/keiko-alerts.yml
+# Prometheus Alert Rules for Keiko Personal Assistant
+# Phase 4, Step 4.1 - Comprehensive Alerting Strategy
+
+groups:
+  # ==========================================================================
+  # APPLICATION HEALTH ALERTS
+  # ==========================================================================
+  - name: keiko.application.health
+    interval: 30s
+    rules:
+      - alert: KeikoApplicationDown
+        expr: up{job="keiko-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          component: application
+        annotations:
+          summary: "Keiko application is down"
+          description: "Keiko backend application has been down for more than 1 minute"
+          runbook_url: "https://docs.keiko.dev/runbooks/application-down"
+
+      - alert: KeikoHealthCheckFailing
+        expr: keiko_health_check_status{check_name!="optional"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          component: health-check
+        annotations:
+          summary: "Keiko health check failing: {{ $labels.check_name }}"
+          description: "Health check '{{ $labels.check_name }}' has been failing for more than 2 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/health-check-failing"
+
+      - alert: KeikoHighErrorRate
+        expr: (rate(keiko_http_requests_total{status_code=~"5.."}[5m]) / rate(keiko_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-error-rate"
+
+      - alert: KeikoSlowResponseTimes
+        expr: histogram_quantile(0.95, rate(keiko_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: api
+        annotations:
+          summary: "Slow response times detected"
+          description: "95th percentile response time is {{ $value }}s for the last 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/slow-response-times"
+
+  - name: keiko.rpc.slo
+    interval: 30s
+    rules:
+      - alert: KEIRPC_P95_Latency_Exceeded
+        expr: histogram_quantile(0.95, rate(keiko_rpc_duration_seconds_bucket[5m])) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: kei-rpc
+        annotations:
+          summary: "KEI-RPC p95 latency exceeded"
+          description: "p95 latency for KEI-RPC exceeded 300ms"
+          runbook_url: "https://docs.keiko.dev/runbooks/kei-rpc-latency"
+
+  # ==========================================================================
+  # INFRASTRUCTURE ALERTS
+  # ==========================================================================
+  - name: keiko.infrastructure
+    interval: 30s
+    rules:
+      - alert: KeikoHighCPUUsage
+        expr: keiko_system_cpu_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% for more than 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-cpu-usage"
+
+      - alert: KeikoHighMemoryUsage
+        expr: keiko_system_memory_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% for more than 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-memory-usage"
+
+      - alert: KeikoDiskSpaceLow
+        expr: (keiko_system_disk_usage_bytes / keiko_system_disk_total_bytes) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+          component: storage
+        annotations:
+          summary: "Low disk space on {{ $labels.device }}"
+          description: "Disk usage is {{ $value | humanizePercentage }} on device {{ $labels.device }}"
+          runbook_url: "https://docs.keiko.dev/runbooks/low-disk-space"
+
+      - alert: KeikoDiskSpaceCritical
+        expr: (keiko_system_disk_usage_bytes / keiko_system_disk_total_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+          component: storage
+        annotations:
+          summary: "Critical disk space on {{ $labels.device }}"
+          description: "Disk usage is {{ $value | humanizePercentage }} on device {{ $labels.device }}"
+          runbook_url: "https://docs.keiko.dev/runbooks/critical-disk-space"
+
+  # ==========================================================================
+  # DATABASE ALERTS
+  # ==========================================================================
+  - name: keiko.database
+    interval: 30s
+    rules:
+      - alert: KeikoPostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: database
+          component: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+          runbook_url: "https://docs.keiko.dev/runbooks/postgresql-down"
+
+      - alert: KeikoSlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(keiko_database_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+          component: postgresql
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s for the last 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/slow-database-queries"
+
+      - alert: KeikoHighDatabaseConnections
+        expr: keiko_database_connections_active / keiko_database_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+          component: postgresql
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-database-connections"
+
+      - alert: KeikoRedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: database
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+          runbook_url: "https://docs.keiko.dev/runbooks/redis-down"
+
+      - alert: KeikoRedisHighMemoryUsage
+        expr: keiko_redis_memory_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+          component: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value }}% for more than 5 minutes"
+          runbook_url: "https://docs.keiko.dev/runbooks/redis-high-memory"
+
+  # ==========================================================================
+  # AGENT SESSION ALERTS
+  # ==========================================================================
+  - name: keiko.agent.sessions
+    interval: 30s
+    rules:
+      - alert: KeikoHighActiveSessions
+        expr: keiko_agent_sessions_active > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: agent
+        annotations:
+          summary: "High number of active agent sessions"
+          description: "There are {{ $value }} active agent sessions, which is unusually high"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-active-sessions"
+
+      - alert: KeikoSlowAgentResponseTimes
+        expr: histogram_quantile(0.95, rate(keiko_agent_response_time_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: agent
+        annotations:
+          summary: "Slow agent response times"
+          description: "95th percentile agent response time is {{ $value }}s"
+          runbook_url: "https://docs.keiko.dev/runbooks/slow-agent-response"
+
+      - alert: KeikoAgentSessionErrors
+        expr: rate(keiko_agent_sessions_errors_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+          component: agent
+        annotations:
+          summary: "High agent session error rate"
+          description: "Agent session error rate is {{ $value }} errors/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/agent-session-errors"
+
+  # ==========================================================================
+  # WEBSOCKET ALERTS
+  # ==========================================================================
+  - name: keiko.websockets
+    interval: 30s
+    rules:
+      - alert: KeikoHighWebSocketConnections
+        expr: keiko_websocket_connections_active > 5000
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          component: websocket
+        annotations:
+          summary: "High number of WebSocket connections"
+          description: "There are {{ $value }} active WebSocket connections"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-websocket-connections"
+
+      - alert: KeikoWebSocketConnectionErrors
+        expr: (rate(keiko_websocket_connection_errors_total[5m])) / (rate(keiko_websocket_connection_attempts_total[5m])) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+          component: websocket
+        annotations:
+          summary: "High WebSocket connection error rate"
+          description: "WebSocket connection error rate is {{ $value }} errors/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/websocket-connection-errors"
+
+  # ==========================================================================
+  # OBSERVABILITY STACK ALERTS
+  # ==========================================================================
+  - name: keiko.observability
+    interval: 60s
+    rules:
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: prometheus
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus monitoring system is down"
+          runbook_url: "https://docs.keiko.dev/runbooks/prometheus-down"
+
+      - alert: JaegerDown
+        expr: up{job="jaeger"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+          component: jaeger
+        annotations:
+          summary: "Jaeger is down"
+          description: "Jaeger tracing system is down"
+          runbook_url: "https://docs.keiko.dev/runbooks/jaeger-down"
+
+      - alert: OtelCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector is down"
+          description: "OpenTelemetry Collector is down, telemetry data may be lost"
+          runbook_url: "https://docs.keiko.dev/runbooks/otel-collector-down"
+
+      - alert: OtelCollectorHighDropRate
+        expr: rate(otelcol_processor_dropped_spans_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: otel-collector
+        annotations:
+          summary: "High span drop rate in OpenTelemetry Collector"
+          description: "OpenTelemetry Collector is dropping {{ $value }} spans/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/otel-collector-dropping-spans"
+
+  # ==========================================================================
+  # BUSINESS METRICS ALERTS
+  # ==========================================================================
+  - name: keiko.business
+    interval: 60s
+    rules:
+      - alert: KeikoLowUserActivity
+        expr: rate(keiko_business_event_total{event_name="user_interaction"}[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+          component: business
+        annotations:
+          summary: "Low user activity detected"
+          description: "User interaction rate is {{ $value }} events/second over the last hour"
+          runbook_url: "https://docs.keiko.dev/runbooks/low-user-activity"
+
+      - alert: KeikoHighUserSignupRate
+        expr: rate(keiko_business_event_total{event_name="user_signup"}[5m]) > 10
+        for: 10m
+        labels:
+          severity: info
+          team: product
+          component: business
+        annotations:
+          summary: "Unusually high user signup rate"
+          description: "User signup rate is {{ $value }} signups/second - potential viral growth or issue"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-signup-rate"
+
+      - alert: KeikoSubscriptionChurnSpike
+        expr: rate(keiko_business_event_total{event_name="subscription_cancelled"}[1h]) > rate(keiko_business_event_total{event_name="subscription_cancelled"}[24h]) * 3
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+          component: business
+        annotations:
+          summary: "Subscription churn spike detected"
+          description: "Subscription cancellation rate is 3x higher than daily average"
+          runbook_url: "https://docs.keiko.dev/runbooks/churn-spike"
+
+  # ==========================================================================
+  # PERFORMANCE ALERTS
+  # ==========================================================================
+  - name: keiko.performance
+    interval: 30s
+    rules:
+      - alert: KeikoHighLatencyP99
+        expr: histogram_quantile(0.99, rate(keiko_http_request_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          component: performance
+        annotations:
+          summary: "High P99 latency detected"
+          description: "99th percentile latency is {{ $value }}s for {{ $labels.endpoint }}"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-latency-p99"
+
+      - alert: KeikoThroughputDrop
+        expr: rate(keiko_http_requests_total[5m]) < rate(keiko_http_requests_total[1h]) * 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          component: performance
+        annotations:
+          summary: "Significant throughput drop detected"
+          description: "Request rate has dropped to {{ $value }} requests/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/throughput-drop"
+
+      - alert: KeikoMemoryLeak
+        expr: increase(keiko_system_memory_percent[1h]) > 20
+        for: 1h
+        labels:
+          severity: warning
+          team: backend
+          component: performance
+        annotations:
+          summary: "Potential memory leak detected"
+          description: "Memory usage increased by {{ $value }}% over the last hour"
+          runbook_url: "https://docs.keiko.dev/runbooks/memory-leak"
+
+  # ==========================================================================
+  # SECURITY ALERTS
+  # ==========================================================================
+  - name: keiko.security
+    interval: 30s
+    rules:
+      - alert: KeikoHighAuthFailureRate
+        expr: rate(keiko_auth_failures_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          component: authentication
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }} failures/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/high-auth-failures"
+
+      - alert: KeikoSuspiciousApiUsage
+        expr: rate(keiko_http_requests_total{status_code="429"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          component: rate-limiting
+        annotations:
+          summary: "High rate limiting activity"
+          description: "Rate limiting is triggering {{ $value }} times/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/suspicious-api-usage"
+
+      - alert: KeikoUnauthorizedAccess
+        expr: rate(keiko_http_requests_total{status_code="401"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          component: authorization
+        annotations:
+          summary: "High unauthorized access attempts"
+          description: "Unauthorized access rate is {{ $value }} attempts/second"
+          runbook_url: "https://docs.keiko.dev/runbooks/unauthorized-access"
