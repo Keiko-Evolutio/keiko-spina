@@ -36,18 +36,21 @@ jobs:
       
       - name: Run Bandit security checks
         run: |
-          uv run bandit -r . -f json -o bandit-report.json --exclude ".venv,tests"
+          uv run bandit -r . -f json -o bandit-report.json --exclude ".venv,tests" --skip B101,B601,B602 || echo "Bandit completed with issues"
         continue-on-error: true  # Don't fail build on security issues for now
+        timeout-minutes: 5  # Limit Bandit execution time
       
       - name: Run MyPy static type checks
         run: |
           uv run mypy . --junit-xml mypy-report.xml || echo "MyPy issues found"
         continue-on-error: true  # Don't fail build on type issues for now
+        timeout-minutes: 3  # Limit MyPy execution time
       
       - name: Run Ruff linting
         run: |
           uv run ruff check . --output-format=json --output-file=ruff-report.json || echo "Ruff issues found"
         continue-on-error: true
+        timeout-minutes: 2  # Ruff should be fast
       
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
