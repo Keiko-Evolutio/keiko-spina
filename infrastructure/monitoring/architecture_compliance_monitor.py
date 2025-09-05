@@ -4,14 +4,13 @@ Architecture Compliance Monitor für Keiko Platform-SDK
 Kontinuierliche Überwachung der Architektur-Compliance mit Metriken und Alerting
 """
 
-import os
 import sys
 import time
 import json
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 from datetime import datetime, timedelta
@@ -245,7 +244,7 @@ class ArchitectureComplianceMonitor:
                     value=violations,
                     status=status,
                     threshold=threshold,
-                    description=f"Cross-imports detected between Platform and SDK",
+                    description="Cross-imports detected between Platform and SDK",
                     timestamp=datetime.now(),
                     details={"analyzer_output": result.stdout[:500]}
                 )

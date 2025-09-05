@@ -127,11 +127,15 @@ __all__ = ["__author__", "__description__", "__version__"]
 if _CORE_AVAILABLE:
     __all__.extend([
         "AgentConfig",
-        "AgentMetadata",
         "AgentMetrics",
         "BaseAgent",
         "ComponentManager",
         "get_component_manager",
+    ])
+
+if _METADATA_AVAILABLE:
+    __all__.extend([
+        "AgentMetadata",
     ])
 
 if _COMMON_AVAILABLE:

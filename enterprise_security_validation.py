@@ -28,7 +28,7 @@ try:
     from config.settings import Settings
     from auth.unified_enterprise_auth import UnifiedEnterpriseAuth
     from config.websocket_auth_config import WEBSOCKET_AUTH_CONFIG
-    from security.kei_mcp_auth import KEIMCPAuthenticator
+    import security.kei_mcp_auth  # noqa: F401
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Please run this script from the project root directory")
@@ -65,7 +65,7 @@ class EnterpriseSecurityValidator:
         
         # A01: Broken Access Control
         try:
-            auth = UnifiedEnterpriseAuth()
+            UnifiedEnterpriseAuth()
             self.add_finding(
                 "OWASP-A01", "HIGH", "Access Control Implementation",
                 "Multi-layered authentication with JWT, mTLS, and RBAC", True
@@ -264,16 +264,16 @@ class EnterpriseSecurityValidator:
         print(f"\n{report['status_emoji']} OVERALL COMPLIANCE: {report['compliance_status']}")
         print(f"📊 Compliance Score: {report['compliance_score']}/{report['max_score']} ({report['compliance_percentage']:.1f}%)")
         
-        print(f"\n📋 FINDINGS SUMMARY:")
+        print("\n📋 FINDINGS SUMMARY:")
         print(f"   ✅ Compliant: {report['compliant_findings']}")
         print(f"   ❌ Non-compliant: {report['non_compliant_findings']}")
         
-        print(f"\n🚨 SEVERITY BREAKDOWN:")
+        print("\n🚨 SEVERITY BREAKDOWN:")
         for severity, count in report['findings_by_severity'].items():
             if count > 0:
                 print(f"   {severity}: {count} issues")
         
-        print(f"\n📂 COMPLIANCE CATEGORIES:")
+        print("\n📂 COMPLIANCE CATEGORIES:")
         for category, findings in report['findings_by_category'].items():
             compliant_count = sum(1 for f in findings if f['compliant'])
             total_count = len(findings)
@@ -303,14 +303,14 @@ async def main():
         with open("enterprise_security_compliance_report.json", "w") as f:
             json.dump(report, f, indent=2, default=str)
         
-        print(f"\n📄 Detailed report saved to: enterprise_security_compliance_report.json")
+        print("\n📄 Detailed report saved to: enterprise_security_compliance_report.json")
         
         # Return exit code based on compliance
         if report['compliance_percentage'] >= 85:
-            print(f"\n✅ Enterprise security standards validation PASSED")
+            print("\n✅ Enterprise security standards validation PASSED")
             return 0
         else:
-            print(f"\n❌ Enterprise security standards validation FAILED")
+            print("\n❌ Enterprise security standards validation FAILED")
             return 1
             
     except Exception as e:

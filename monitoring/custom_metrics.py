@@ -25,14 +25,10 @@ logger = get_logger(__name__)
 # Import der neuen Observability-Komponenten (lazy import um Circular Dependencies zu vermeiden)
 try:
     from observability.agent_metrics import (
-        AgentMetricsCollector,
         ErrorCategory,
         get_agent_metrics_collector,
-        get_all_agent_metrics,
     )
     from observability.metrics_aggregator import (
-        AggregationType,
-        AggregationWindow,
         metrics_aggregator,
     )
     from observability.system_integration_metrics import system_integration_metrics

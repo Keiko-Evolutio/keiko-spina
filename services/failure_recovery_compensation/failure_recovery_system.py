@@ -1104,10 +1104,10 @@ class FailureRecoverySystem:
         try:
             # Berechne Overall Health basierend auf Failures und Recoveries
             total_failures = len(self._failure_history)
-            active_failures = len([f for f in self._failure_contexts.values()
+            len([f for f in self._failure_contexts.values()
                                  if f.occurred_at > datetime.utcnow() - timedelta(minutes=5)])
 
-            active_recoveries = len([r for r in self._active_recoveries.values()
+            len([r for r in self._active_recoveries.values()
                                    if r.state == RecoveryState.IN_PROGRESS])
 
             # Berechne Health-Score

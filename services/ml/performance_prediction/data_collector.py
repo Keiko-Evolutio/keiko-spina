@@ -102,11 +102,10 @@ class PerformanceDataCollector:
         try:
             # Zeitfenster für Datensammlung
             end_time = datetime.utcnow()
-            start_time = end_time - timedelta(seconds=self.collection_interval_seconds * 2)
+            end_time - timedelta(seconds=self.collection_interval_seconds * 2)
 
             # Hole Tasks vom Task Manager (vereinfacht für Demo)
             # TODO: Implementiere echte Integration mit Task Manager - Issue: https://github.com/keiko-dev-team/keiko-personal-assistant/issues/113
-            all_tasks = []  # Placeholder - würde echte completed tasks holen
 
             # Simuliere completed tasks für Demo
             completed_tasks = [

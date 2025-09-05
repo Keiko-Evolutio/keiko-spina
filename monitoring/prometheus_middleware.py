@@ -42,34 +42,34 @@ REGISTERED_AGENTS = Counter(
 async def prometheus_middleware(request: Request, call_next: Callable) -> Response:
     """Prometheus metrics collection middleware"""
     start_time = time.time()
-    
+
     # Extract request information
     method = request.method
     endpoint = request.url.path
     repository = "keiko-backend"
-    
+
     try:
         # Process request
         response = await call_next(request)
-        
+
         # Record metrics
         duration = time.time() - start_time
-        
+
         REQUEST_DURATION.labels(
             method=method,
             endpoint=endpoint,
             repository=repository
         ).observe(duration)
-        
+
         REQUEST_COUNT.labels(
             method=method,
             endpoint=endpoint,
             status_code=response.status_code,
             repository=repository
         ).inc()
-        
+
         return response
-        
+
     except Exception as e:
         # Record error metrics
         API_ERRORS.labels(

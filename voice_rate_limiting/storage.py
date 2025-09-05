@@ -402,7 +402,7 @@ def create_rate_limit_store(redis_url: str | None = None, force_in_memory: bool 
     # Versuche Redis Store zu erstellen
     try:
         # Prüfe ob redis package verfügbar ist
-        import redis.asyncio as redis
+        import redis.asyncio  # noqa: F401
         logger.info(f"Using Redis rate limit store: {redis_url}")
         return RedisRateLimitStore(redis_url)
     except ImportError:

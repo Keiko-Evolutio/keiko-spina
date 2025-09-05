@@ -567,7 +567,7 @@ class SecurityAuditAdapter:
             "high": SecurityAuditLevel.ERROR,
             "critical": SecurityAuditLevel.CRITICAL
         }
-        level = level_mapping.get(severity.lower(), SecurityAuditLevel.WARNING)
+        level_mapping.get(severity.lower(), SecurityAuditLevel.WARNING)
 
         return await self.log_event(
             event_type=SecurityAuditEventType.SECURITY_VIOLATION,

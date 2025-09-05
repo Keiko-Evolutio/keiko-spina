@@ -246,7 +246,7 @@ class WebRTCSignalingServer:
     ) -> None:
         """Verarbeitet Signaling Message."""
         message_type = message_data.get("type")
-        session_id = message_data.get("session_id", connection.session_id)
+        message_data.get("session_id", connection.session_id)
 
         try:
             # Message parsen
@@ -279,7 +279,7 @@ class WebRTCSignalingServer:
         session_id = message.session_id
 
         # Session erstellen oder aktualisieren
-        session = await self._get_or_create_session(session_id, connection)
+        await self._get_or_create_session(session_id, connection)
 
         # Offer an andere Teilnehmer weiterleiten
         await self._relay_message_to_session_peers(connection, message, session_id)

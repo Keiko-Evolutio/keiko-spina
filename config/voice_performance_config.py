@@ -197,7 +197,7 @@ def generate_voice_performance_env_template(file_path: str = ".env.voice_perform
 # Vordefinierte Konfigurationen für verschiedene Umgebungen
 def get_development_settings() -> VoicePerformanceSettings:
     """Entwicklungs-Konfiguration mit weniger aggressiven Limits."""
-    dev_settings = get_voice_performance_settings()
+    get_voice_performance_settings()
 
     # Weniger aggressive Limits für Development
     settings.target_latency_ms = 1000

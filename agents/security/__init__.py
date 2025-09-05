@@ -8,7 +8,7 @@ Umfassendes Sicherheitssystem für KEI-Agents mit:
 - Secure Communication zwischen Agents
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from kei_logging import get_logger
 
@@ -98,25 +98,25 @@ def initialize_security_system() -> dict[str, Any]:
     try:
         # Teste Imports der Security-Komponenten
         try:
-            from .encryption import EncryptionManager
+            import agents.security.encryption  # noqa: F401
             _security_components["encryption"] = True
         except ImportError:
             _security_components["encryption"] = False
 
         try:
-            from .threat_detection import ThreatDetector
+            import agents.security.threat_detection  # noqa: F401
             _security_components["threat_detection"] = True
         except ImportError:
             _security_components["threat_detection"] = False
 
         try:
-            from .authentication import AuthenticationManager
+            import agents.security.authentication  # noqa: F401
             _security_components["authentication"] = True
         except ImportError:
             _security_components["authentication"] = False
 
         try:
-            from .secure_communication import SecureCommunicationManager
+            import agents.security.secure_communication  # noqa: F401
             _security_components["secure_communication"] = True
         except ImportError:
             _security_components["secure_communication"] = False

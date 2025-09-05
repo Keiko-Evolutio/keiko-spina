@@ -274,7 +274,6 @@ class PlanValidator:
 
         # Prüfe Deadline-Einhaltung
         if request.deadline:
-            estimated_completion = request.request_timestamp
             # TODO: Berechne geschätzte Completion-Zeit basierend auf Plan - Issue: https://github.com/keiko-dev-team/keiko-personal-assistant/issues/115
 
             # Vereinfachte Prüfung

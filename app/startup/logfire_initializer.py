@@ -176,7 +176,7 @@ class LogfireInitializer(ServiceInitializer):
                 return
 
             # Sammle Startup-Informationen
-            startup_info = {
+            {
                 "service_name": "keiko-personal-assistant",
                 "version": "1.0.0",
                 "environment": "development",

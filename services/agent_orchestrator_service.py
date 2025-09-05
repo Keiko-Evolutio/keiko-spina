@@ -14,7 +14,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 import httpx
-import json
 
 try:
     from kei_logging import get_logger
@@ -275,7 +274,7 @@ class AgentOrchestratorService:
     async def _publish_agent_event(self, event_type: str, data: AgentRegistration):
         """Publiziert Agent-Events über Backend-Messaging"""
         try:
-            event_payload = {
+            {
                 "event_type": event_type,
                 "agent_id": data.agent_id,
                 "timestamp": datetime.now(UTC).isoformat(),

@@ -589,7 +589,7 @@ class AuditIntegration:
             await asyncio.sleep(0.002)  # Simulierte Latenz
 
             # Erstelle Audit-Event
-            audit_event = {
+            {
                 "task_id": task.task_id,
                 "task_type": task.task_type.value,
                 "task_state": task.state.value,

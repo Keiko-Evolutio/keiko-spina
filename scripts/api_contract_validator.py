@@ -4,19 +4,14 @@ API Contract Validator für Keiko Platform-SDK Kommunikation
 Automatisierte Validierung der API-Verträge in CI/CD Pipeline
 """
 
-import os
 import sys
 import json
 import yaml
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional, Any
+from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
-import requests
-import jsonschema
-from jsonschema import validate, ValidationError
-import openapi_spec_validator
 from openapi_spec_validator import validate_spec
 from openapi_spec_validator.readers import read_from_filename
 
@@ -540,14 +535,14 @@ def main():
         f.write(report_content)
     
     # Ausgabe Summary
-    print(f"\n📊 VALIDATION SUMMARY:")
+    print("\n📊 VALIDATION SUMMARY:")
     print(f"Total Contracts: {report.total_contracts}")
     print(f"Passed: {report.passed_contracts}")
     print(f"Failed: {report.failed_contracts}")
     print(f"Warnings: {report.warnings}")
     print(f"Execution Time: {report.execution_time_ms}ms")
     
-    print(f"\n📄 Detailed report saved: api_contract_validation_report.md")
+    print("\n📄 Detailed report saved: api_contract_validation_report.md")
     
     # Exit Code für CI/CD
     if report.failed_contracts > 0:
@@ -557,7 +552,7 @@ def main():
         print(f"\n⚠️ VALIDATION PASSED WITH WARNINGS: {report.warnings} warnings")
         return 0
     else:
-        print(f"\n✅ VALIDATION PASSED: All contracts valid")
+        print("\n✅ VALIDATION PASSED: All contracts valid")
         return 0
 
 if __name__ == "__main__":

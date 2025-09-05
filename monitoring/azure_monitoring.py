@@ -124,26 +124,10 @@ async def shutdown_azure_monitoring() -> None:
         _azure_monitoring = None
 
 
-def record_azure_metric(name: str, value: float, properties: dict[str, Any] | None = None) -> None:
-    """Zeichnet Azure Metrik auf."""
-    if _azure_monitoring:
-        _azure_monitoring.record_metric(name, value, properties)
 
 
-def record_azure_business_event(name: str, properties: dict[str, Any] | None = None) -> None:
-    """Zeichnet Azure Business Event auf."""
-    if _azure_monitoring:
-        _azure_monitoring.record_event(name, properties)
-
-
-def record_azure_error(exception: Exception, properties: dict[str, Any] | None = None) -> None:
-    """Zeichnet Azure Fehler auf."""
-    if _azure_monitoring:
-        _azure_monitoring.record_exception(exception, properties)
-
-
-def get_azure_metrics() -> dict[str, Any]:
-    """Gibt Azure Monitor Status zurück."""
+async def get_azure_monitoring_status() -> dict[str, Any]:
+    """Gibt detaillierten Azure Monitor Status zurück."""
     if _azure_monitoring:
         return {
             "azure_monitor_enabled": _azure_monitoring.is_enabled,
@@ -160,11 +144,6 @@ def get_azure_metrics() -> dict[str, Any]:
     }
 
 
-async def get_azure_monitoring_status() -> dict[str, Any]:
-    """Gibt detaillierten Azure Monitor Status zurück."""
-    return get_azure_metrics()
-
-
 # ============================================================================
 # EXPORTS
 # ============================================================================
@@ -172,11 +151,7 @@ async def get_azure_monitoring_status() -> dict[str, Any]:
 __all__ = [
     "AzureMonitoringConfig",
     "AzureMonitoringIntegration",
-    "get_azure_metrics",
     "get_azure_monitoring_status",
     "initialize_azure_monitoring",
-    "record_azure_business_event",
-    "record_azure_error",
-    "record_azure_metric",
     "shutdown_azure_monitoring",
 ]

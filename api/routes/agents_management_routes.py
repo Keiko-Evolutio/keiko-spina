@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 # Vereinheitlicht: Unified Auth + require_scopes
 # from auth.simple_enterprise_auth import Scope, require_scope
-from agents.metadata.agent_metadata import AgentMetadata
+from agents.metadata.agent_metadata import AgentMetadata, CapabilityStatus
 from agents.metadata.service import metadata_service
 from agents.registry.dynamic_registry import dynamic_registry
 from api.middleware.scope_middleware import require_scopes

@@ -334,7 +334,7 @@ class LogfireManager:
     def _instrument_anthropic(self) -> None:
         """Instrumentiert Anthropic API-Calls."""
         try:
-            import anthropic
+            import anthropic  # noqa: F401
             logfire.instrument_anthropic()
         except ImportError:
             raise ImportError("Anthropic package nicht installiert. Installieren Sie mit: pip install anthropic")
@@ -361,7 +361,7 @@ class LogfireManager:
     def _instrument_sqlalchemy(self) -> None:
         """Instrumentiert SQLAlchemy Database-Queries."""
         try:
-            import sqlalchemy
+            import sqlalchemy  # noqa: F401
             logfire.instrument_sqlalchemy()
         except ImportError:
             raise ImportError("SQLAlchemy package nicht installiert. Installieren Sie mit: pip install 'logfire[sqlalchemy]'")
@@ -381,7 +381,7 @@ class LogfireManager:
         """Instrumentiert System-Metriken (CPU, Memory, Disk)."""
         try:
             # Prüfe ob das System-Metrics-Package verfügbar ist
-            from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
+            from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor  # noqa: F401
             logfire.instrument_system_metrics()
         except ImportError:
             raise ImportError("System-Metrics package nicht installiert. Installieren Sie mit: pip install 'logfire[system-metrics]'")

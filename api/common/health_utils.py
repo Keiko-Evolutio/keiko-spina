@@ -212,7 +212,7 @@ def _check_agents_integration() -> bool:
         True wenn Agent-System verfügbar
     """
     try:
-        from agents import get_system_status
+        import agents  # noqa: F401
         return True
     except ImportError:
         return False

@@ -377,7 +377,7 @@ class LogLinkFilter(logging.Filter):
             # Integration mit Observability
             if self.registry.config.link_with_observability:
                 try:
-                    from observability import add_span_attributes, trace_span
+                    from observability import add_span_attributes
 
                     # Füge Log-ID zu aktuellem Span hinzu
                     add_span_attributes({
@@ -388,7 +388,6 @@ class LogLinkFilter(logging.Filter):
 
                 except ImportError:
                     add_span_attributes = None
-                    trace_span = None
                     # Observability nicht verfügbar
 
         except Exception as e:

@@ -11,9 +11,8 @@ import json
 import yaml
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 from pathlib import Path
-import tempfile
 import shutil
 
 try:
@@ -561,7 +560,7 @@ class DisasterRecoveryTester:
         # Failed Tests
         failed_tests = [r for r in self.test_results if not r.success]
         if failed_tests:
-            print(f"\n❌ FEHLGESCHLAGENE TESTS:")
+            print("\n❌ FEHLGESCHLAGENE TESTS:")
             for test in failed_tests:
                 print(f"  - {test.test_name}: {test.error_message}")
         

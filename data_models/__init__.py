@@ -93,13 +93,10 @@ from .core import (
 # Utility-Funktionen und Konstanten exportieren
 from .utils import (
     ValidationMixin,
-    create_event_id,
-    create_update_id,
     generate_short_id,
     generate_uuid,
     utc_now,
     validate_non_empty_string,
-    validate_uri,
 )
 
 # WebSocket Models - Event-Strukturen
@@ -196,12 +193,9 @@ __all__ = [
     "VoiceOutputEvent",
     "VoiceSettings",
     "WebSocketEvent",
-    "create_event_id",
-    "create_update_id",
     "generate_short_id",
     # Utility Functions
     "generate_uuid",
     "utc_now",
     "validate_non_empty_string",
-    "validate_uri",
 ]

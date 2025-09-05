@@ -230,7 +230,6 @@ class TestBaseWorker:
         worker = TestWorker(config)
 
         await worker.start()
-        initial_cycle_count = worker.cycle_count
 
         await worker.restart()
 

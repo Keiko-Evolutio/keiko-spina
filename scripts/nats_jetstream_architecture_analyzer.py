@@ -4,11 +4,8 @@ NATS JetStream Architecture Analyzer für Issue #56
 Analysiert die geplante Messaging-first Architecture auf Architektur-Compliance
 """
 
-import ast
-import re
 import json
-from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -245,7 +242,6 @@ response = await http_client.post("/api/v1/events/agent", event_data)
         
         # Berechne Compliance Score
         total_violations = len(all_violations)
-        max_possible_violations = 20  # Geschätzte maximale Anzahl
         compliance_score = max(0, 10 - (total_violations * 2))  # 10 = perfekt, 0 = kritisch
         
         return {
@@ -313,12 +309,12 @@ def main():
     report = analyzer.generate_compliance_report()
     
     # Ausgabe Summary
-    print(f"\n📊 COMPLIANCE SUMMARY:")
+    print("\n📊 COMPLIANCE SUMMARY:")
     print(f"Gefundene Verletzungen: {report['summary']['total_violations']}")
     print(f"Compliance Score: {report['summary']['compliance_score']}")
     print(f"Assessment: {report['summary']['overall_assessment']}")
     
-    print(f"\n🚨 RISIKO-VERTEILUNG:")
+    print("\n🚨 RISIKO-VERTEILUNG:")
     for risk, count in report['summary']['risk_distribution'].items():
         print(f"{risk.upper()}: {count}")
     
@@ -331,20 +327,20 @@ def main():
     
     # Empfehlungen ausgeben
     if report['recommendations']:
-        print(f"\n💡 EMPFEHLUNGEN:")
+        print("\n💡 EMPFEHLUNGEN:")
         for i, rec in enumerate(report['recommendations'], 1):
             print(f"{i}. {rec}")
     
     # Exit Code basierend auf Compliance Score
     score = int(report['summary']['compliance_score'].split('/')[0])
     if score >= 8:
-        print(f"\n✅ ERFOLG: Gute Architektur-Compliance!")
+        print("\n✅ ERFOLG: Gute Architektur-Compliance!")
         return 0
     elif score >= 6:
-        print(f"\n⚠️ WARNUNG: Moderate Architektur-Risiken gefunden!")
+        print("\n⚠️ WARNUNG: Moderate Architektur-Risiken gefunden!")
         return 1
     else:
-        print(f"\n❌ KRITISCH: Hohe Architektur-Risiken gefunden!")
+        print("\n❌ KRITISCH: Hohe Architektur-Risiken gefunden!")
         return 2
 
 if __name__ == "__main__":

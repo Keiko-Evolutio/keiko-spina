@@ -6,8 +6,6 @@ Gruppiert die Probleme nach Dateien und Modulen für eine strukturierte Task-Ers
 
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from pathlib import Path
-import re
 
 def parse_inspection_file(file_path):
     """Parst die PyCharm-Inspektionsdatei und extrahiert alle Probleme."""
@@ -100,7 +98,7 @@ def generate_task_recommendations(grouped_problems):
     tasks = []
     
     for module, files in grouped_problems.items():
-        total_problems = sum(len(problems) for problems in files.values())
+        sum(len(problems) for problems in files.values())
         
         # Gruppiere Dateien nach Priorität
         high_priority_files = []
@@ -144,7 +142,7 @@ def print_analysis_report(tasks):
     print("=" * 80)
     
     total_problems = sum(task['total_problems'] for task in tasks)
-    print(f"\nGESAMTÜBERSICHT:")
+    print("\nGESAMTÜBERSICHT:")
     print(f"- Gesamtanzahl Probleme: {total_problems}")
     print(f"- Anzahl Module: {len(set(task['module'] for task in tasks))}")
     print(f"- Anzahl Tasks: {len(tasks)}")
@@ -153,7 +151,7 @@ def print_analysis_report(tasks):
     priority_order = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
     tasks.sort(key=lambda x: (priority_order[x['priority']], -x['total_problems']))
     
-    print(f"\nDETAILLIERTE AUFSCHLÜSSELUNG:")
+    print("\nDETAILLIERTE AUFSCHLÜSSELUNG:")
     print("-" * 80)
     
     for i, task in enumerate(tasks, 1):

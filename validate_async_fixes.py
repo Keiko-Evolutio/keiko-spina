@@ -39,7 +39,7 @@ class AsyncCallValidator(ast.NodeVisitor):
         if not self.current_function_is_async:
             self.issues.append((
                 node.lineno,
-                f"await verwendet außerhalb einer async-Funktion"
+                "await verwendet außerhalb einer async-Funktion"
             ))
         
         # Prüfe spezifische Patterns
@@ -65,7 +65,7 @@ class AsyncCallValidator(ast.NodeVisitor):
                 if node.func.value.id == "context":
                     self.issues.append((
                         node.lineno,
-                        f"Möglicher fehlender await bei context.abort()"
+                        "Möglicher fehlender await bei context.abort()"
                     ))
         
         self.generic_visit(node)

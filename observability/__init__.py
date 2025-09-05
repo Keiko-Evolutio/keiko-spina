@@ -524,7 +524,7 @@ async def stop_observability_system() -> bool:
                 try:
                     loop = asyncio.get_running_loop()
                     # Event Loop läuft bereits - erstelle Task
-                    task = loop.create_task(shutdown_tracing())
+                    loop.create_task(shutdown_tracing())
                     # Warte nicht auf Completion, da wir im Shutdown sind
                     logger.info("OpenTelemetry-Tracing Shutdown-Task erstellt")
                 except RuntimeError:

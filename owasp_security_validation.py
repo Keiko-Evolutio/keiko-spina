@@ -353,12 +353,6 @@ class OWASPSecurityValidator:
         logger.info("🌐 Validating SSRF Protection...")
         
         # Test SSRF attempts (if applicable endpoints exist)
-        ssrf_payloads = [
-            "http://localhost:22",
-            "http://127.0.0.1:3306",
-            "http://169.254.169.254/latest/meta-data/",
-            "file:///etc/passwd",
-        ]
         
         # This would test endpoints that accept URLs
         # For now, we'll just log that SSRF protection should be verified

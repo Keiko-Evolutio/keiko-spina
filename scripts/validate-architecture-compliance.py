@@ -4,13 +4,11 @@ Automatisierte Validierung der Repository-Trennung und Architektur-Compliance
 Überprüft dass keine Cross-Dependencies zwischen den Repositories bestehen
 """
 
-import os
 import re
 import sys
 import json
-import subprocess
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import List
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -464,7 +462,7 @@ def main():
             print(f"  {warning}")
     
     # Detaillierte Ergebnisse
-    print(f"\n📋 DETAILLIERTE ERGEBNISSE:")
+    print("\n📋 DETAILLIERTE ERGEBNISSE:")
     for result in report.results:
         status = "✅" if result.passed else "❌"
         print(f"  {status} {result.test_name}: {result.message}")

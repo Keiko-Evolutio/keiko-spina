@@ -228,7 +228,7 @@ class PlatformNATSClient:
             })
 
             # Publiziere Message
-            ack = await self.jetstream.publish(
+            await self.jetstream.publish(
                 subject=message.subject,
                 payload=json.dumps(message.data).encode(),
                 headers=headers,

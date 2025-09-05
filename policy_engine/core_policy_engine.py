@@ -577,12 +577,6 @@ class PolicyEngine:
         if self._oso:
             try:
                 # Erweitere Oso-Evaluation mit Kontext
-                evaluation_context = {
-                    "subject": subject,
-                    "action": action,
-                    "resource": resource,
-                    **(context or {})
-                }
                 return POLICY_DECISION_ALLOW if self._oso.is_allowed(subject, action, resource) else POLICY_DECISION_DENY
             except Exception:
                 pass

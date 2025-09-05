@@ -1,6 +1,6 @@
 """API Middleware für Keiko."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

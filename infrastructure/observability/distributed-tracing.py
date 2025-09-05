@@ -5,10 +5,9 @@ Distributed Tracing, Correlation-IDs und Business-Metriken
 
 import uuid
 import time
-import json
 import asyncio
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, UTC
 from contextvars import ContextVar
 from functools import wraps

@@ -105,7 +105,7 @@ def get_voice_rate_limit_service() -> Any:
     # Prüfe Konfiguration - wenn deaktiviert, return None
     try:
         from config.voice_rate_limiting_config import VoiceRateLimitSettings
-        from voice_rate_limiting.service import VoiceRateLimitService
+        import voice_rate_limiting.service  # noqa: F401
 
         settings = VoiceRateLimitSettings()
         if not settings.enabled:

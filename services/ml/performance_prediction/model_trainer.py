@@ -227,11 +227,11 @@ class ModelTrainer:
         y_pred_test = model.predict(X_test)
 
         # Metriken berechnen
-        train_mae = mean_absolute_error(y_train, y_pred_train)
+        mean_absolute_error(y_train, y_pred_train)
         test_mae = mean_absolute_error(y_test, y_pred_test)
-        train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+        np.sqrt(mean_squared_error(y_train, y_pred_train))
         test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
-        train_r2 = r2_score(y_train, y_pred_train)
+        r2_score(y_train, y_pred_train)
         test_r2 = r2_score(y_test, y_pred_test)
 
         # MAPE (Mean Absolute Percentage Error)

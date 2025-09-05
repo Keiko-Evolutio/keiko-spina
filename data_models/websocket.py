@@ -32,7 +32,7 @@ from .constants import (
     # Progress Constants
     MIN_PROGRESS,
 )
-from .utils import create_event_id, utc_now
+from .utils import generate_short_id, utc_now
 
 
 class EventType(str, Enum):
@@ -51,7 +51,7 @@ class EventType(str, Enum):
 
 class BaseWebSocketEvent(BaseModel):
     """Basis-Event mit minimalen required Feldern."""
-    event_id: str = Field(default_factory=create_event_id)
+    event_id: str = Field(default_factory=lambda: generate_short_id("evt_"))
     event_type: EventType
     timestamp: datetime = Field(default_factory=utc_now)
     correlation_id: str | None = Field(None, description="Korrelations-ID für Event-Tracking")
@@ -211,35 +211,3 @@ def create_status_update(
     )
 
 
-def create_error_event(
-    error_code: str,
-    message: str,
-    recoverable: bool = True,
-    details: dict[str, Any] | None = None,
-    correlation_id: str | None = None
-) -> ErrorEvent:
-    """Factory-Funktion für ErrorEvent."""
-    return ErrorEvent(
-        error_code=error_code,
-        message=message,
-        recoverable=recoverable,
-        details=details,
-        correlation_id=correlation_id
-    )
-
-
-def create_function_call(
-    function_name: str,
-    arguments: dict[str, Any],
-    requires_confirmation: bool = False,
-    description: str | None = None,
-    correlation_id: str | None = None
-) -> FunctionCallEvent:
-    """Factory-Funktion für FunctionCallEvent."""
-    return FunctionCallEvent(
-        function_name=function_name,
-        arguments=arguments,
-        requires_confirmation=requires_confirmation,
-        description=description,
-        correlation_id=correlation_id
-    )

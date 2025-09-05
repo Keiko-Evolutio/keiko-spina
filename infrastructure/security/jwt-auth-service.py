@@ -4,7 +4,6 @@ Zentrale Authentifizierung zwischen Services
 """
 
 import jwt
-import time
 import secrets
 from datetime import datetime, timedelta, UTC
 from typing import Dict, Optional, List

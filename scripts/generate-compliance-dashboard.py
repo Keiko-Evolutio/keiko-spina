@@ -414,7 +414,7 @@ def main():
     generator = ComplianceDashboardGenerator(args.framework, args.period)
     files = generator.save_dashboard(args.output)
     
-    print(f"✅ Compliance dashboard generated successfully!")
+    print("✅ Compliance dashboard generated successfully!")
     print(f"📊 Framework: {args.framework}")
     print(f"📅 Period: {args.period} days")
     print(f"📁 Output directory: {args.output}")

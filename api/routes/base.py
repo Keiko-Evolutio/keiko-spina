@@ -9,7 +9,7 @@ from fastapi import APIRouter
 def check_agents_integration() -> bool:
     """Prüft Agent System Verfügbarkeit."""
     try:
-        from agents import get_system_status
+        import agents  # noqa: F401
         return True
     except ImportError:
         return False

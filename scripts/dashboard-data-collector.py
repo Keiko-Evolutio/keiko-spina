@@ -11,7 +11,7 @@ import os
 import sys
 import requests
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import argparse
 
 
@@ -304,8 +304,8 @@ def main():
         data = collector.collect_comprehensive_data(args.days)
         collector.save_data(data, args.output)
         
-        print(f"✅ Data collection completed successfully!")
-        print(f"📊 Summary:")
+        print("✅ Data collection completed successfully!")
+        print("📊 Summary:")
         print(f"  - Workflows: {data['summary']['total_workflows']}")
         print(f"  - Runs: {data['summary']['total_runs']}")
         print(f"  - Success Rate: {data['summary']['success_rate']}%")

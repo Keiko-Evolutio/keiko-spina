@@ -5,11 +5,10 @@ Analysiert Cross-Dependencies zwischen Platform und SDK
 """
 
 import ast
-import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List
 from dataclasses import dataclass
 from enum import Enum
 import json
@@ -267,7 +266,7 @@ def main():
     # Erstelle Bericht
     total_violations = sum(len(violations) for violations in results.values())
     
-    print(f"\n📊 ANALYSE-ERGEBNISSE:")
+    print("\n📊 ANALYSE-ERGEBNISSE:")
     print(f"Direkte Imports: {len(results['direct_imports'])}")
     print(f"AST-Verletzungen: {len(results['ast_violations'])}")
     print(f"Verdächtige Patterns: {len(results['suspicious_patterns'])}")

@@ -45,7 +45,7 @@ class AgentLoadingMixin:
     async def _check_custom_adapter(self) -> None:
         """Prüft Custom-Adapter-Verfügbarkeit."""
         try:
-            from agents.custom_loader.custom_loader import load_custom_agents
+            import agents.custom_loader.custom_loader  # noqa: F401
             self._custom_available = True
         except ImportError as e:
             self._custom_available = False

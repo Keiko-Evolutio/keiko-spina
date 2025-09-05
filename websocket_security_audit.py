@@ -342,7 +342,7 @@ class EnterpriseWebSocketAudit:
                 f"{self.ws_url}/ws/client/system_heartbeat_client",
                 extra_headers=headers,
                 timeout=5
-            ) as websocket:
+            ):
                 logger.info(f"✅ Handshake successful: {test_name}")
                 
         except Exception as e:
@@ -459,7 +459,7 @@ class EnterpriseWebSocketAudit:
                 f"{self.ws_url}{endpoint}",
                 extra_headers=headers,
                 timeout=5
-            ) as websocket:
+            ):
                 logger.warning(f"⚠️ Unexpected success for: {scenario_name}")
                 
         except websockets.exceptions.InvalidStatusCode as e:
@@ -653,7 +653,7 @@ class EnterpriseWebSocketAudit:
         logger.info(f"📋 MEDIUM: {summary['medium_findings']}")
         logger.info(f"ℹ️ LOW: {summary['low_findings']}")
         
-        logger.info(f"\n🔌 WEBSOCKET ENDPOINTS:")
+        logger.info("\n🔌 WEBSOCKET ENDPOINTS:")
         logger.info(f"   Tested: {summary['websocket_endpoints_tested']}")
         logger.info(f"   Successful: {summary['successful_connections']}")
         

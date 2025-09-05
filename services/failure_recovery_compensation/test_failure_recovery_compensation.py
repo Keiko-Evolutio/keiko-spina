@@ -364,7 +364,7 @@ class TestCompensationFramework:
             )
 
             # Führe Saga aus (kann fehlschlagen und Compensation auslösen)
-            success = await framework.execute_saga_transaction(
+            await framework.execute_saga_transaction(
                 saga_id=saga.saga_id,
                 security_context=security_context
             )
