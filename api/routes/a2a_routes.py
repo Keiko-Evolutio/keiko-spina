@@ -62,7 +62,7 @@ class SendA2AResponse(BaseModel):
 @router.post(
     "/send",
     response_model=SendA2AResponse,
-    dependencies=[Depends(require_auth), Depends(lambda req: require_rate_limit(req, operation="default"))],
+    dependencies=[Depends(require_auth), Depends(lambda req: require_rate_limit(req, bucket="default"))],
 )
 async def send_a2a(request: SendA2ARequest) -> SendA2AResponse:
     """Sendet eine A2A-Nachricht über den Bus."""

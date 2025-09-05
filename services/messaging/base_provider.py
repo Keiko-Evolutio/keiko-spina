@@ -243,7 +243,7 @@ class BaseProvider(ABC):
             # Verwende Privacy-Konfiguration für Feldentschlüsselung
             fields_to_decrypt = bus_settings.privacy.encrypted_fields or []
             key_id = bus_settings.privacy.encryption_key_id or "default"
-            decrypted_payload = decrypt_fields(envelope.payload, fields_to_decrypt, key_id)
+            decrypted_payload = decrypt_fields(envelope.payload)
             # Erstelle neue Envelope-Instanz mit entschlüsseltem Payload
             return envelope.model_copy(update={"payload": decrypted_payload})
         except Exception as exc:

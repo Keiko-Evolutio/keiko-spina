@@ -479,10 +479,9 @@ class AzureRealtimeClient:
             ws_url, headers = AzureRealtimeClient._build_websocket_url()
             logger.info(f"🔌 Connecting to Azure OpenAI Realtime API for {self.user_id}")
 
-            # SSL-Kontext für Development-Umgebung konfigurieren
+            # SSL-Kontext mit sicherer Konfiguration
             ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            # SSL-Verifikation ist kritisch für Produktionssicherheit
 
             self.ws = await websockets.connect(
                 ws_url,
@@ -1234,9 +1233,6 @@ class AzureRealtimeClient:
 
         except json.JSONDecodeError as e:
             logger.exception(f"❌ Invalid JSON from Azure: {e}")
-        except (ValueError, TypeError) as e:
-            logger.error(f"❌ Event handling error - Validierungsfehler: {e}")
-
             # Generisches Event-Forwarding an Client (sicher)
             await safe_send_websocket_response(websocket, "azure_event", {
                 "event_type": event_type,
@@ -1244,15 +1240,13 @@ class AzureRealtimeClient:
             })
         except (ConnectionError, TimeoutError) as e:
             logger.error(f"❌ Event handling error - Verbindungsproblem: {e}")
-
             # Generisches Event-Forwarding an Client (sicher)
             await safe_send_websocket_response(websocket, "azure_event", {
                 "event_type": event_type,
                 "data": event
             })
-        except (json.JSONDecodeError, KeyError, ValueError, RuntimeError) as e:
+        except (ValueError, TypeError, KeyError, RuntimeError) as e:
             logger.exception(f"❌ Event handling error - Unerwarteter Fehler: {e}")
-
             # Generisches Event-Forwarding an Client (sicher)
             await safe_send_websocket_response(websocket, "azure_event", {
                 "event_type": event_type,
@@ -2328,7 +2322,7 @@ class VoiceHealthMonitor:
                 "Azure connectivity module not available",
                 {"import_error": str(e)}, start_time, str(e)
             )
-        except (RuntimeError, AttributeError, ImportError) as e:
+        except (RuntimeError, AttributeError) as e:
             return create_health_check_result(
                 ComponentType.AZURE_CONNECTIVITY, HealthStatus.CRITICAL,
                 "Azure connectivity validation failed", {}, start_time, str(e)
@@ -2372,7 +2366,7 @@ class VoiceHealthMonitor:
                 "Audio pipeline module not available",
                 {"import_error": str(e)}, start_time, str(e)
             )
-        except (RuntimeError, AttributeError, ImportError) as e:
+        except (RuntimeError, AttributeError) as e:
             return create_health_check_result(
                 ComponentType.AUDIO_PIPELINE, HealthStatus.CRITICAL,
                 "Audio pipeline validation failed", {}, start_time, str(e)

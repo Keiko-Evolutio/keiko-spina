@@ -296,6 +296,6 @@ class HealthChecker(IHealthChecker):
         """Prüft Metrics Collector."""
         try:
             metrics = self.metrics_collector.get_metrics()
-            return len(metrics) >= 0  # Collector ist verfügbar
+            return len(metrics) > 0  # Collector ist verfügbar und hat Daten
         except Exception:
             return False

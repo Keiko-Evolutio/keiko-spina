@@ -453,12 +453,8 @@ class QuotaEnforcementMiddleware(BaseHTTPMiddleware):
         # Berechne Kosten basierend auf Request und Response
         operation_type = f"{context['method']} {context['path']}"
 
-        # Basis-Kosten
-        Decimal("0.001")
-
         # Variable Kosten basierend auf Response-Size
         response_size = len(response.body) if hasattr(response, "body") else 0
-        Decimal(str(response_size / 1024)) * Decimal("0.0001")  # Pro KB
 
         return budget_manager.cost_tracker.calculate_operation_cost(
             operation_type=operation_type,

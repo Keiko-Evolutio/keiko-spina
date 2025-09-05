@@ -338,7 +338,7 @@ class CostTracker:
             variable_cost += Decimal(str(storage_mb_hours)) * self._pricing_model[CostCategory.STORAGE]
 
         # Wende Custom-Multiplier an
-        if custom_multiplier != 1.0:
+        if abs(custom_multiplier - 1.0) > 1e-6:
             variable_cost *= Decimal(str(custom_multiplier))
 
         operation_cost = OperationCost(

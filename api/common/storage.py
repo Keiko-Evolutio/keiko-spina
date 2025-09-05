@@ -103,7 +103,7 @@ class InMemoryStorage(BaseStorage[T]):
         self._data: dict[str, T] = {}
         self._lock = asyncio.Lock()
         self._enable_ttl = enable_ttl
-        self._ttl_data: dict[str, float] = {} if enable_ttl else {}
+        self._ttl_data: dict[str, float] | None = {} if enable_ttl else None
 
     async def get(self, key: str) -> T | None:
         """Ruft Element ab und prüft TTL falls aktiviert."""

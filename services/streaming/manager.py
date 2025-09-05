@@ -226,10 +226,7 @@ class WebSocketManager:
                 # Lazy-Import, um Zirkularimporte zu vermeiden
                 from .handlers import handle_function_confirmation
 
-                if asyncio.iscoroutinefunction(handle_function_confirmation):
-                    await handle_function_confirmation(connection_id, message_data)
-                else:
-                    await handle_function_confirmation(connection_id, message_data)
+                await handle_function_confirmation(connection_id, message_data)
                 return
 
             event_type = EventType(message_data.get("event_type", ""))

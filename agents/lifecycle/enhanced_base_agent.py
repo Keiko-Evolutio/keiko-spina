@@ -336,7 +336,7 @@ class EnhancedBaseAgent(BaseAgent, ABC):
             execution_time = time.time() - start_time
 
             # Stelle sicher, dass execution_time gesetzt ist
-            if hasattr(result, "execution_time") and result.execution_time == 0.0:
+            if hasattr(result, "execution_time") and result.execution_time < 1e-6:
                 # Da AgentOperationResult frozen ist, erstelle neue Instanz mit korrekter execution_time
                 from dataclasses import replace
                 result = replace(result, execution_time=execution_time)

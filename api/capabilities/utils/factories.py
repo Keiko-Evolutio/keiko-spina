@@ -7,7 +7,7 @@ Erstellungs-Interfaces bereit.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Generic
 
 from ..models.capability_models import APICapability, CapabilityCategory
 from ..models.feature_flag_models import FeatureFlag, FeatureScope, FeatureStatus
@@ -18,7 +18,7 @@ from .constants import (
 T = TypeVar("T")
 
 
-class BaseFactory[T](ABC):
+class BaseFactory(Generic[T], ABC):
     """Abstrakte Basis-Factory für einheitliche Factory-Patterns.
 
     Eliminiert Code-Duplikation zwischen verschiedenen Factory-Implementierungen.

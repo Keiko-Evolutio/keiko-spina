@@ -534,7 +534,7 @@ class ExecutionEngine:
                 "Agents Found in Registry",
                 "agent_call",
                 subtask_id=subtask.subtask_id,
-                agent_count=len(available_agents_raw) if isinstance(available_agents_raw, list) else len(available_agents_raw)
+                agent_count=len(available_agents_raw)
             )
 
             # Konvertiere zu Dictionary falls Liste zurückgegeben wird

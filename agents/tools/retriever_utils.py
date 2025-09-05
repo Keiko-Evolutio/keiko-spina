@@ -52,7 +52,7 @@ def cosine_similarity(vector_a: list[float], vector_b: list[float]) -> float:
     norm_a = math.sqrt(sum(x * x for x in vector_a))
     norm_b = math.sqrt(sum(y * y for y in vector_b))
 
-    if norm_a == 0.0 or norm_b == 0.0:
+    if norm_a < 1e-10 or norm_b < 1e-10:
         return 0.0
 
     return dot_product / (norm_a * norm_b)

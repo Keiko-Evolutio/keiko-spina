@@ -150,8 +150,8 @@ class WebhookManager:
                         logger.warning(f"WebhookManager: Worker‑Shutdown meldete Ausnahme (Index={idx}): {res}")
                 except asyncio.CancelledError:
                     logger.info(f"WebhookManager: Worker‑Shutdown Task (Index={idx}) durch Cancel beendet")
-                except (TimeoutError, asyncio.CancelledError) as exc:  # pragma: no cover
-                    logger.info(f"WebhookManager: Worker‑Shutdown Task (Index={idx}) durch Timeout/Cancel beendet: {exc}")
+                except TimeoutError as exc:  # pragma: no cover
+                    logger.info(f"WebhookManager: Worker‑Shutdown Task (Index={idx}) durch Timeout beendet: {exc}")
                 except Exception as exc:  # pragma: no cover
                     logger.warning(f"WebhookManager: Unerwartete Ausnahme beim Warten auf Shutdown‑Task (Index={idx}): {exc}")
 

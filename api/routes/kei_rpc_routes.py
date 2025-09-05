@@ -25,7 +25,7 @@ from api.grpc.models import (
     PlanResponse,
     TraceContext,
 )
-from api.grpc.service import kei_rpc_service as grpc_service
+from api.grpc import kei_rpc_service as grpc_service
 from kei_logging import get_logger
 from observability import trace_function, trace_span
 from security.kei_mcp_auth import require_auth
@@ -102,9 +102,9 @@ async def check_rpc_quota(
 
         # Quota für RPC-Operation prüfen
         await check_agent_capability_quota(
-            tenant_id=tenant_id,
+            agent_id=f"kei_rpc_agent",
             capability_id=f"kei_rpc_{operation_type}",
-            operation="execute"
+            tenant_id=tenant_id
         )
 
     except Exception as e:

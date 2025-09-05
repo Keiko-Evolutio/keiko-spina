@@ -581,7 +581,7 @@ class KEIMCPAuthenticator:
             Validierungsergebnis
         """
         try:
-            # JWT Header dekodieren um Key ID zu erhalten
+            # JWT Header dekodieren um Key ID zu erhalten (Token wird danach vollständig verifiziert)
             unverified_header = jwt.get_unverified_header(token)
             kid = unverified_header.get("kid")
 

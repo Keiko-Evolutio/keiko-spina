@@ -227,7 +227,7 @@ class EnhancedPIIRedactor:
             # API-Key-Patterns
             RedactionPattern(
                 data_type=DataType.API_KEY,
-                pattern=re.compile(r'(?i)(?:api[_-]?key|apikey|access[_-]?key)\s*[:=]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?'),
+                pattern=re.compile(r'(?i)(?:api[_-]?key|access[_-]?key)\s*[:=]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?'),
                 redaction_level=self.config.redaction_levels.get(DataType.API_KEY, RedactionLevel.FULL),
                 replacement_template="api_key=***REDACTED***",
                 description="API keys"
@@ -291,7 +291,7 @@ class EnhancedPIIRedactor:
             # Session-ID-Patterns
             RedactionPattern(
                 data_type=DataType.SESSION_ID,
-                pattern=re.compile(r'(?i)(?:session[_-]?id|sessionid)\s*[:=]\s*["\']?([a-zA-Z0-9_-]{16,})["\']?'),
+                pattern=re.compile(r'(?i)session[_-]?id\s*[:=]\s*["\']?([a-zA-Z0-9_-]{16,})["\']?'),
                 redaction_level=self.config.redaction_levels.get(DataType.SESSION_ID, RedactionLevel.HASH),
                 replacement_template="session_id=[HASH]",
                 description="Session IDs"

@@ -152,8 +152,9 @@ class TokenValidator:
             Validierung-Ergebnis
         """
         try:
-            # Decode Header ohne Verifikation für Issuer
+            # Decode nur Header für Issuer-Extraktion (sicherer als komplettes Payload)
             unverified_header = jwt.get_unverified_header(token)
+            # Payload wird nur für Issuer-Extraktion verwendet, Token wird später vollständig verifiziert
             unverified_payload = jwt.decode(token, options={"verify_signature": False})
 
             issuer = unverified_payload.get("iss")

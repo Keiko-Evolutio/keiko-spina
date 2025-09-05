@@ -438,19 +438,19 @@ class EncryptionManager:
         # IV generieren
         iv = os.urandom(16)
 
-        # Cipher erstellen
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+        # Cipher erstellen mit sicherem GCM Mode (Authenticated Encryption)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
         encryptor = cipher.encryptor()
 
-        # Verschlüsseln
-        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+        # Verschlüsseln ohne Padding (GCM macht das automatisch)
+        ciphertext = encryptor.update(data) + encryptor.finalize()
 
-        # IV + Ciphertext kombinieren
-        return iv + ciphertext
+        # IV + Authentication Tag + Ciphertext kombinieren
+        return iv + encryptor.tag + ciphertext
 
     @staticmethod
-    def _decrypt_aes_cbc(encrypted_data: bytes, key: bytes) -> bytes:
-        """Entschlüsselt mit AES-256-CBC.
+    def _decrypt_aes_gcm(encrypted_data: bytes, key: bytes) -> bytes:
+        """Entschlüsselt mit AES-256-GCM (sicher).
 
         Args:
             encrypted_data: Verschlüsselte Daten (IV + Ciphertext)
@@ -459,20 +459,19 @@ class EncryptionManager:
         Returns:
             Entschlüsselte Daten
         """
-        # IV und Ciphertext extrahieren
+        # IV extrahieren (erste 16 Bytes)
         iv = encrypted_data[:16]
-        ciphertext = encrypted_data[16:]
+        # Authentication Tag extrahieren (nächste 16 Bytes)
+        tag = encrypted_data[16:32]
+        # Ciphertext extrahieren (Rest)
+        ciphertext = encrypted_data[32:]
 
-        # Cipher erstellen
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+        # Cipher erstellen mit GCM Mode
+        cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
         decryptor = cipher.decryptor()
 
-        # Entschlüsseln
-        padded_data = decryptor.update(ciphertext) + decryptor.finalize()
-
-        # Padding entfernen (PKCS7)
-        pad_length = padded_data[-1]
-        return padded_data[:-pad_length]
+        # Entschlüsseln mit automatischer Authentifizierung
+        return decryptor.update(ciphertext) + decryptor.finalize()
 
     @staticmethod
     def generate_hash(

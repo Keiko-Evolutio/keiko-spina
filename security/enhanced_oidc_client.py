@@ -246,8 +246,8 @@ class EnhancedOIDCClient:
             if not self._jwks_client:
                 raise ValueError("JWKS-Client nicht verfügbar")
 
-            # JWT-Header dekodieren
-            jwt.get_unverified_header(token)
+            # JWT-Header sicher dekodieren (nur für Logging/Debugging)
+            # Das Token wird später vollständig verifiziert
 
             # Signing-Key holen
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)

@@ -378,7 +378,7 @@ def create_voice_cosmos_manager(
         Konfigurierter VoiceCosmosDBManager
     """
     if settings is None:
-        settings = settings  # Verwende globale settings
+        raise ValueError("Cosmos DB settings must be provided - no global settings available")
 
     return VoiceCosmosDBManager(settings)
 
