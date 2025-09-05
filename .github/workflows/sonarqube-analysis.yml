@@ -1,0 +1,96 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Disable shallow clones for better SonarQube analysis
+        fetch-depth: 0
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        uv sync --group dev --group test --frozen
+    
+    - name: Run tests and generate coverage
+      run: |
+        uv run pytest --cov-report=xml --cov-report=term-missing --junitxml=pytest-junit.xml
+      env:
+        ENVIRONMENT: test
+    
+    - name: Run security scan
+      run: |
+        uv run bandit -r . -x tests/ -f json -o bandit-report.json || true
+    
+    - name: Run type checking
+      run: |
+        uv run mypy --no-error-summary . > mypy-report.txt 2>&1 || true
+    
+    - name: Run linting
+      run: |
+        uv run ruff check . --output-format=json > ruff-report.json || true
+    
+    - name: SonarQube Scan
+      uses: sonarqube-quality-gate-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      with:
+        scanMetadataReportFile: .scannerwork/report-task.txt
+    
+    - name: SonarQube Analysis
+      run: |
+        sonar-scanner \
+          -Dsonar.projectKey=keiko-backend \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+          -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+          -Dsonar.python.coverage.reportPaths=coverage.xml \
+          -Dsonar.python.xunit.reportPath=pytest-junit.xml \
+          -Dsonar.python.bandit.reportPaths=bandit-report.json \
+          -Dsonar.qualitygate.wait=true
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-reports-${{ matrix.python-version }}
+        path: |
+          coverage.xml
+          pytest-junit.xml
+          bandit-report.json
+          mypy-report.txt
+          ruff-report.json
+    
+    - name: Upload SonarQube results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: sonarqube-results-${{ matrix.python-version }}
+        path: .scannerwork/

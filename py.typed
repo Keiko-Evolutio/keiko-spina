@@ -1,0 +1,27 @@
+# PEP 561 Type Distribution Marker
+# This file indicates that the keiko-backend package supports type checking
+# and provides inline type annotations according to PEP 561.
+#
+# For more information, see:
+# https://peps.python.org/pep-0561/
+#
+# This marker file enables:
+# - Type checkers (mypy, pyright, etc.) to recognize this package as typed
+# - IDE support for type hints and autocompletion
+# - Distribution of type information with the package
+# - Third-party packages to import and use our type annotations
+#
+# Package Type Coverage:
+# - Core modules: Fully typed with strict mode
+# - API layer: Fully typed with strict mode  
+# - Agents framework: Core modules fully typed
+# - Configuration: Fully typed with strict mode
+# - Data models: Fully typed with strict mode
+# - Authentication: Fully typed with strict mode
+# - Monitoring: Fully typed with strict mode
+#
+# Gradual Typing Strategy:
+# - Critical business logic: Strict typing enabled
+# - Legacy modules: Gradual migration to strict typing
+# - Test code: Relaxed typing for flexibility
+# - Third-party integrations: Explicit ignore for untyped libraries

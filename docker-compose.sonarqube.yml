@@ -1,0 +1,121 @@
+# SonarQube Development Environment
+# =================================
+# Complete SonarQube stack for local code analysis
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database for SonarQube
+  sonarqube-postgres:
+    image: postgres:15-alpine
+    container_name: sonarqube-postgres
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: sonarqube_password
+    volumes:
+      - sonarqube-postgres-data:/var/lib/postgresql/data
+    networks:
+      - sonarqube-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonarqube -d sonarqube"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # SonarQube Server
+  sonarqube:
+    image: sonarqube:10.4-community
+    container_name: sonarqube-server
+    depends_on:
+      sonarqube-postgres:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+      - "9092:9092"
+    environment:
+      # Database configuration
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: sonarqube_password
+      
+      # JVM Options
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      
+      # Web server configuration
+      SONAR_WEB_HOST: "0.0.0.0"
+      SONAR_WEB_PORT: "9000"
+      
+      # Compute Engine
+      SONAR_CE_JAVAADDITIONALOPTS: "-Xmx512m -Xms128m"
+      
+      # Web JVM
+      SONAR_WEB_JAVAADDITIONALOPTS: "-Xmx512m -Xms128m"
+      
+      # Search configuration
+      SONAR_SEARCH_JAVAADDITIONALOPTS: "-Xmx512m -Xms128m"
+      
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-extensions:/opt/sonarqube/extensions
+    networks:
+      - sonarqube-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/api/system/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # SonarQube Scanner CLI (for running scans)
+  sonar-scanner:
+    image: sonarsource/sonar-scanner-cli:latest
+    container_name: sonar-scanner-cli
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    environment:
+      SONAR_HOST_URL: http://sonarqube:9000
+      SONAR_TOKEN: ${SONAR_TOKEN:-}
+    volumes:
+      - .:/usr/src
+    networks:
+      - sonarqube-network
+    profiles:
+      - tools
+    command: |
+      sh -c "
+        echo 'Waiting for SonarQube to be ready...'
+        sleep 30
+        echo 'Running SonarQube analysis...'
+        sonar-scanner \
+          -Dsonar.projectKey=keiko-backend \
+          -Dsonar.sources=/usr/src \
+          -Dsonar.host.url=http://sonarqube:9000 \
+          -Dsonar.token=${SONAR_TOKEN}
+      "
+
+volumes:
+  sonarqube-postgres-data:
+    driver: local
+    name: sonarqube-postgres-data
+  sonarqube-data:
+    driver: local  
+    name: sonarqube-data
+  sonarqube-logs:
+    driver: local
+    name: sonarqube-logs
+  sonarqube-extensions:
+    driver: local
+    name: sonarqube-extensions
+
+networks:
+  sonarqube-network:
+    driver: bridge
+    name: sonarqube-network

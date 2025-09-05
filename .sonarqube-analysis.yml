@@ -1,0 +1,161 @@
+# SonarQube Analysis Workflow Configuration
+# =======================================
+# This file configures the SonarQube analysis for GitHub Actions
+# and provides templates for local and CI/CD integration
+
+name: SonarQube Analysis
+description: "Comprehensive code quality analysis for Keiko Backend"
+
+# Analysis configuration
+analysis:
+  # Source directories to analyze
+  sources:
+    - "agents"
+    - "api"
+    - "app" 
+    - "auth"
+    - "config"
+    - "core"
+    - "data_models"
+    - "kei_logging"
+    - "messaging"
+    - "middleware"
+    - "monitoring"
+    - "observability"
+    - "policy_engine"
+    - "quotas_limits"
+    - "security"
+    - "services"
+    - "storage"
+    - "task_management"
+    - "utils"
+    - "voice"
+    - "voice_performance"
+    - "voice_rate_limiting"
+    - "audit_system"
+    - "specs"
+
+  # Test directories
+  tests:
+    - "tests"
+
+  # Files and patterns to exclude
+  exclusions:
+    # Build and cache directories
+    - "**/venv/**"
+    - "**/__pycache__/**"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/.pytest_cache/**"
+    - "**/.mypy_cache/**"
+    - "**/.ruff_cache/**"
+    - "**/htmlcov/**"
+    - "**/mypy-report/**"
+    - "**/site-packages/**"
+    
+    # Database migrations and generated code
+    - "**/migrations/**"
+    - "**/alembic/versions/**"
+    - "**/*_pb2.py"
+    - "**/*_pb2_grpc.py"
+    
+    # Configuration and setup files
+    - "**/__init__.py"
+    - "**/constants.py"
+    - "docker-compose*.yml"
+    - "Dockerfile*"
+    - "*.md"
+    - "*.txt"
+    - "*.json"
+    - "*.yaml"
+    - "*.yml"
+    - "*.toml"
+    - "*.cfg"
+    - "*.ini"
+    
+    # Third-party and vendor code
+    - "**/vendor/**"
+    - "**/third_party/**"
+    - "**/external/**"
+    - "**/lib/**"
+    - "**/.venv/**"
+    - "**/.env/**"
+
+  # Quality gates and thresholds
+  quality_gates:
+    coverage_threshold: 85  # Matches project requirement
+    duplicated_lines_density: 3
+    maintainability_rating: A
+    reliability_rating: A
+    security_rating: A
+    security_hotspots_reviewed: 100
+
+  # External tool integration
+  external_reports:
+    coverage: "coverage.xml"
+    test_results: "pytest-junit.xml"
+    bandit_security: "bandit-report.json"
+    mypy_typing: "mypy-report.json"
+
+# Supported environments
+environments:
+  local:
+    sonar_host: "http://localhost:9000"
+    sonar_token: "${SONAR_TOKEN}"
+    
+  ci:
+    sonar_host: "${SONAR_HOST_URL}"
+    sonar_token: "${SONAR_TOKEN}"
+    
+  cloud:
+    sonar_host: "https://sonarcloud.io"
+    sonar_token: "${SONARCLOUD_TOKEN}"
+    organization: "keiko-development"
+
+# Report formats
+reports:
+  formats:
+    - "json"
+    - "xml"
+    - "html"
+  
+  output_directory: "sonar-reports"
+  
+  # Quality metrics to track
+  metrics:
+    - "coverage"
+    - "lines"
+    - "ncloc"
+    - "functions"
+    - "classes"
+    - "files"
+    - "duplicated_lines"
+    - "complexity"
+    - "cognitive_complexity"
+    - "violations"
+    - "bugs"
+    - "vulnerabilities"
+    - "code_smells"
+    - "security_hotspots"
+    - "maintainability_rating"
+    - "reliability_rating" 
+    - "security_rating"
+
+# Integration settings
+integration:
+  # Pull Request decoration
+  pr_decoration:
+    enabled: true
+    comment_analysis: true
+    
+  # Git integration
+  git:
+    branch_analysis: true
+    pull_request_analysis: true
+    
+  # Notification settings
+  notifications:
+    email: true
+    slack: false
+    teams: false
