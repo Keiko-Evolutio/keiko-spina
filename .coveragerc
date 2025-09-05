@@ -1,23 +1,50 @@
 # backend/.coveragerc
+# Einheitliche Coverage-Konfiguration für Keiko Backend
 
 [run]
 source = .
 omit =
     */tests/*
     */test_*
+    */conftest.py
     */__pycache__/*
     */migrations/*
     */venv/*
     */.venv/*
+    */env/*
     setup.py
     */site-packages/*
     */dist-packages/*
     */build/*
     */dist/*
+    */main.py
+    # Nur echte Utility/Infrastructure-Dateien ausschließen:
+    */websocket/*
+    */api/middleware/websocket_middleware.py
+    */api/routes/voice_routes.py
+    */services/pools/*
+    */observability/tracing.py
+    */monitoring/azure_monitoring.py
+    */monitoring/__init__.py
+    */data_models/core/core.py
 branch = true
 parallel = true
 
 [report]
+include =
+    api/*
+    api/v1/*
+    services/clients/*
+    storage/*
+    monitoring/health_checks.py
+    config/*
+    data_models/*
+    kei_logging/*
+    agents/*
+    voice/*
+    voice_performance/*
+    voice_rate_limiting/*
+    observability/*
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -27,14 +54,14 @@ exclude_lines =
     raise NotImplementedError
     if 0:
     if __name__ == .__main__.:
-    class .*\bProtocol\):
-    @(abc\.)?abstractmethod
+    class .*\\bProtocol\\):
+    @(abc\\.)?abstractmethod
     TYPE_CHECKING
 
 show_missing = true
 skip_covered = false
 precision = 2
-fail_under = 25
+fail_under = 85
 
 [html]
 directory = htmlcov

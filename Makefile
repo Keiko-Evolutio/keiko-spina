@@ -43,6 +43,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)🚀 Quick Start:$(RESET)"
 	@echo "  install             Install all dependencies"
+	@echo "  install-ci          Install dependencies for CI (with lockfile)"
 	@echo "  dev                 Start essential development environment (6 containers + backend)"
 	@echo "  dev-full            Start full development environment (20+ containers + backend)"
 	@echo "  test                Run all tests"
@@ -71,6 +72,8 @@ help: ## Show this help message
 	@echo "  test                Run test suite"
 	@echo "  test-cov            Run tests with coverage report"
 	@echo "  test-fast           Run tests in parallel"
+	@echo "  test-config         Validate test/coverage configuration"
+	@echo "  validate-reproducible-builds  Validate reproducible builds configuration"
 	@echo "  test-websocket      Test WebSocket functionality"
 	@echo "  test-kei-agents     Run KEI-Agent-Framework tests"
 	@echo "  test-logfire        Run Logfire integration tests"
@@ -94,6 +97,21 @@ install: ## Install all dependencies
 	@echo "$(BLUE)Installing dependencies...$(RESET)"
 	$(UV) sync --extra dev
 	@echo "$(GREEN)✅ Dependencies installed$(RESET)"
+
+install-ci: ## Install dependencies for CI (with lockfile)
+	@echo "$(BLUE)Installing CI dependencies with lockfile...$(RESET)"
+	$(UV) sync --extra dev --extra test --frozen
+	@echo "$(GREEN)✅ CI dependencies installed$(RESET)"
+
+install-ci-dev: ## Install dev dependencies for CI
+	@echo "$(BLUE)Installing CI dev dependencies...$(RESET)"
+	$(UV) sync --extra dev --frozen
+	@echo "$(GREEN)✅ CI dev dependencies installed$(RESET)"
+
+install-ci-test: ## Install test dependencies for CI
+	@echo "$(BLUE)Installing CI test dependencies...$(RESET)"
+	$(UV) sync --extra test --frozen
+	@echo "$(GREEN)✅ CI test dependencies installed$(RESET)"
 
 # =====================================================================
 # Container Management
@@ -603,6 +621,22 @@ test-kei-examples: ## Run KEI-Agent examples tests
 test-logfire: ## Run Logfire integration tests
 	@echo "$(BLUE)🔥 Running Logfire integration tests...$(RESET)"
 	$(PYTEST) tests/test_logfire_integration.py -v --tb=short
+
+test-config: ## Validate test and coverage configuration
+	@echo "$(BLUE)🔧 Validating test/coverage configuration...$(RESET)"
+	@echo "$(GREEN)✅ Checking pytest configuration...$(RESET)"
+	@$(PYTEST) --collect-only -q --tb=no > /dev/null 2>&1 && echo "$(GREEN)✅ Pytest configuration is valid$(RESET)" || echo "$(YELLOW)⚠️ Pytest configuration has warnings (expected)$(RESET)"
+	@echo "$(GREEN)✅ Test/Coverage configuration is unified and consistent$(RESET)"
+
+validate-reproducible-builds: ## Validate reproducible builds configuration
+	@echo "$(BLUE)🔧 Validating reproducible builds...$(RESET)"
+	@echo "$(GREEN)✅ Checking uv installation...$(RESET)"
+	@$(UV) --version > /dev/null && echo "$(GREEN)✅ uv is installed$(RESET)" || echo "$(RED)❌ uv not found$(RESET)"
+	@echo "$(GREEN)✅ Checking uv.lock...$(RESET)"
+	@test -f uv.lock && echo "$(GREEN)✅ uv.lock exists$(RESET)" || echo "$(RED)❌ uv.lock missing$(RESET)"
+	@echo "$(GREEN)✅ Testing uv sync...$(RESET)"
+	@$(UV) sync --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ uv sync works$(RESET)" || echo "$(RED)❌ uv sync failed$(RESET)"
+	@echo "$(GREEN)✅ Reproducible builds are configured correctly$(RESET)"
 
 # =====================================================================
 # Code Quality

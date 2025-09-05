@@ -1,5 +1,5 @@
-# backend/Dockerfile.dev
-# Development Dockerfile für Keiko Backend
+# backend/Dockerfile
+# Production Dockerfile für Keiko Backend mit uv
 
 FROM python:3.12-slim as base
 
@@ -25,10 +25,10 @@ RUN useradd --create-home --shell /bin/bash app \
 COPY --chown=app:app pyproject.toml uv.lock ./
 
 # Install dependencies with lockfile for reproducible builds
-RUN uv sync --extra dev --frozen
+RUN uv sync --frozen
 
-# Development stage
-FROM base as development
+# Production stage
+FROM base as production
 
 # Switch to non-root user
 USER app
@@ -36,8 +36,12 @@ USER app
 # Copy source code
 COPY --chown=app:app . .
 
-# Expose ports
-EXPOSE 8000 8001
+# Expose port
+EXPOSE 8000
 
-# Development command with hot-reload
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--ws", "websockets-sansio"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Production command
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

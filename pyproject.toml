@@ -297,150 +297,11 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.pytest.ini_options]
-minversion = "8.0"
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--verbose",
-    "--tb=short",
-    "--cov=.",
-    "--cov-branch",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml",
-    "--cov-fail-under=85",
-    "--durations=10",
-    "--disable-warnings",
-]
-testpaths = [
-    "tests",
-]
-python_files = [
-    "test_*.py",
-    "*_test.py",
-]
-python_classes = [
-    "Test*",
-]
-python_functions = [
-    "test_*",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
-    "contract: marks tests as contract tests",
-    "agents: marks tests as agents tests",
-    "common: marks tests as common tests",
-    "azure: marks tests as azure tests",
-    "execution: marks tests as execution tests",
-    "observability: marks tests related to observability features",
-    "monitoring: marks tests related to monitoring features",
-    "perf: marks performance tests",
-    "performance: marks performance tests for latency and throughput",
-    "system: marks system-level tests",
-    "reliability: marks fault-tolerance and recovery tests",
-    "voice: marks voice-system specific tests",
-    "mcp: marks MCP client and server tests",
-    "error_recovery: marks error-handling and recovery tests",
-    "enterprise: marks enterprise-grade requirements tests",
-    "security: marks security-related tests",
-    "audit: marks audit-logging tests",
-    "e2e: marks end-to-end tests",
-    "conformance: marks protocol conformance tests",
-    "sdk: marks SDK client tests",
-    "stress: marks stress testing scenarios",
-    "schema: marks schema-validation tests",
-    "circuit_breaker: marks circuit breaker tests",
-    "rate_limit: marks rate limiting tests",
-]
-asyncio_mode = "auto"
-timeout = 300
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
-]
+# Pytest-Konfiguration wurde nach pytest.ini verschoben
+# um Duplikate zu vermeiden und eine einheitliche Quelle der Wahrheit zu haben
 
-[tool.coverage.run]
-source = [
-    ".",
-]
-omit = [
-    "*/tests/*",
-    "*/test_*",
-    "*/conftest.py",
-    "*/__pycache__/*",
-    "*/venv/*",
-    "*/env/*",
-    "*/migrations/*",
-    "*/main.py",
-    # KRITISCHE MODULE ENTFERNT - MÜSSEN GETESTET WERDEN:
-    # "*/agents/*",           # ENTFERNT: Agent-System ist kritisch
-    # "*/voice/*",            # ENTFERNT: Voice-Funktionalität ist kritisch
-    # "*/voice_performance/*", # ENTFERNT: Performance-SLAs müssen validiert werden
-    # "*/voice_rate_limiting/*", # ENTFERNT: Rate Limiting ist kritisch
-    # "*/storage/cache/redis_cache.py", # ENTFERNT: Cache-Logic ist kritisch
-    # "*/observability/*",    # ENTFERNT: Monitoring ist kritisch
-
-    # Nur echte Utility/Infrastructure-Dateien ausschließen:
-    "*/websocket/*",  # WebSocket-Infrastruktur (wird in Integration Tests getestet)
-    "*/api/middleware/websocket_middleware.py",  # WebSocket-Middleware (Integration Tests)
-    "*/api/routes/voice_routes.py",  # Voice Routes (E2E Tests)
-    "*/services/pools/*",  # Connection Pools (Infrastructure)
-    "*/observability/tracing.py",  # Tracing-Setup (Infrastructure)
-    "*/monitoring/azure_monitoring.py",  # Azure-spezifisches Monitoring
-    "*/monitoring/__init__.py",  # Init-Dateien
-    "*/data_models/core/core.py",  # Core Data Models (Schema-only)
-]
-branch = true
-parallel = true
-
-[tool.coverage.report]
-include = [
-    "api/*",
-    "api/v1/*",
-    "services/clients/*",
-    "storage/*",
-    "monitoring/health_checks.py",
-    "config/*",
-    "data_models/*",
-    "kei_logging/*",
-]
-omit = [
-    "*/main.py",
-    "*/agents/*",
-    "*/websocket/*",
-    "*/api/middleware/websocket_middleware.py",
-    "*/api/routes/voice_routes.py",
-    "*/voice/*",
-    "*/services/pools/*",
-    "*/observability/tracing.py",
-    "*/monitoring/azure_monitoring.py",
-    "*/monitoring/__init__.py",
-    "*/storage/cache/redis_cache.py",
-    "*/data_models/core/core.py",
-    "*/tests/*",
-    "*/test_*",
-    "*/conftest.py",
-]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-]
-show_missing = true
-precision = 2
-
-[tool.coverage.html]
-directory = "htmlcov"
+# Coverage-Konfiguration wurde nach .coveragerc verschoben
+# um Duplikate zu vermeiden und eine einheitliche Quelle der Wahrheit zu haben
 
 [tool.black]
 line-length = 100
@@ -498,8 +359,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.default.scripts]
-test = "pytest {args:tests}"
-test-cov = "coverage run -m pytest {args:tests}"
+test = "pytest {args}"
+test-cov = "pytest --cov {args}"
 cov-report = [
     "- coverage combine",
     "coverage report",
