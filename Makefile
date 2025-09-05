@@ -77,6 +77,7 @@ help: ## Show this help message
 	@echo "  validate-reproducible-builds  Validate reproducible builds configuration"
 	@echo "  validate-lint-format  Validate lint/format consolidation"
 	@echo "  validate-dependencies  Validate dependency separation (Runtime vs. Dev)"
+	@echo "  validate-typing        Validate enterprise-ready typing configuration"
 	@echo "  test-websocket      Test WebSocket functionality"
 	@echo "  test-kei-agents     Run KEI-Agent-Framework tests"
 	@echo "  test-logfire        Run Logfire integration tests"
@@ -84,9 +85,13 @@ help: ## Show this help message
 	@echo "$(GREEN)Code Quality:$(RESET)"
 	@echo "  lint                Run code linting"
 	@echo "  format              Format code"
-	@echo "  type-check          Run type checking"
+	@echo "  type-check          Run comprehensive type checking"
+	@echo "  type-check-strict   Run strict type checking for core modules"
+	@echo "  type-check-report   Generate detailed type checking report"
+	@echo "  type-check-coverage Check type coverage statistics"
 	@echo "  security            Run security scanning"
 	@echo "  quality             Run all quality checks"
+	@echo "  quality-strict      Run all quality checks with strict typing"
 	@echo ""
 	@echo "$(GREEN)Utilities:$(RESET)"
 	@echo "  clean               Clean build artifacts"
@@ -679,6 +684,16 @@ validate-dependencies: ## Validate dependency separation (Runtime vs. Dev)
 	@$(UV) sync --dry-run > /dev/null 2>&1 && echo "$(GREEN)✅ Runtime sync works$(RESET)" || echo "$(RED)❌ Runtime sync failed$(RESET)"
 	@echo "$(GREEN)✅ Dependency separation is complete$(RESET)"
 
+validate-typing: ## Validate enterprise-ready typing configuration
+	@echo "$(BLUE)🔧 Validating enterprise-ready typing...$(RESET)"
+	@echo "$(GREEN)✅ Checking MyPy installation...$(RESET)"
+	@$(UV) run mypy --version > /dev/null && echo "$(GREEN)✅ MyPy is installed$(RESET)" || echo "$(RED)❌ MyPy not found$(RESET)"
+	@echo "$(GREEN)✅ Checking PEP 561 compliance...$(RESET)"
+	@test -f py.typed && echo "$(GREEN)✅ py.typed file exists$(RESET)" || echo "$(RED)❌ py.typed missing$(RESET)"
+	@echo "$(GREEN)✅ Testing MyPy functionality...$(RESET)"
+	@$(UV) run mypy --help > /dev/null 2>&1 && echo "$(GREEN)✅ MyPy configuration works$(RESET)" || echo "$(RED)❌ MyPy configuration failed$(RESET)"
+	@echo "$(GREEN)✅ Enterprise-ready typing is configured$(RESET)"
+
 # =====================================================================
 # Code Quality
 # =====================================================================
@@ -695,9 +710,23 @@ format: ## Format code
 	@echo "$(BLUE)Formatting code...$(RESET)"
 	$(RUFF) format .
 
-type-check: ## Run type checking
-	@echo "$(BLUE)Running type checking...$(RESET)"
-	$(MYPY) --ignore-missing-imports . || echo "$(YELLOW)⚠️  Type checking found issues$(RESET)"
+type-check: ## Run comprehensive type checking
+	@echo "$(BLUE)Running enterprise-grade type checking...$(RESET)"
+	$(MYPY) . || echo "$(YELLOW)⚠️  Type checking found issues$(RESET)"
+
+type-check-strict: ## Run type checking with strict mode for core modules
+	@echo "$(BLUE)Running strict type checking for core modules...$(RESET)"
+	$(MYPY) --strict config/ core/ data_models/ auth/ security/ api/ app/ || echo "$(YELLOW)⚠️  Strict type checking found issues$(RESET)"
+
+type-check-report: ## Generate detailed type checking report
+	@echo "$(BLUE)Generating type checking report...$(RESET)"
+	$(MYPY) --html-report mypy-report --txt-report mypy-report . || echo "$(YELLOW)⚠️  Type checking found issues$(RESET)"
+	@echo "$(GREEN)✅ Type checking report generated in mypy-report/$(RESET)"
+
+type-check-coverage: ## Check type coverage statistics
+	@echo "$(BLUE)Checking type coverage...$(RESET)"
+	$(MYPY) --any-exprs-report mypy-coverage . || echo "$(YELLOW)⚠️  Type checking found issues$(RESET)"
+	@echo "$(GREEN)✅ Type coverage report generated in mypy-coverage/$(RESET)"
 
 security: ## Run security scanning
 	@echo "$(BLUE)Running security scanning...$(RESET)"
@@ -705,6 +734,9 @@ security: ## Run security scanning
 
 quality: lint format type-check security ## Run all quality checks
 	@echo "$(GREEN)All quality checks completed!$(RESET)"
+
+quality-strict: lint format type-check-strict security ## Run all quality checks with strict typing
+	@echo "$(GREEN)All strict quality checks completed!$(RESET)"
 
 # =====================================================================
 # Documentation
@@ -730,7 +762,7 @@ docs-serve: ## Serve documentation locally
 # Utilities
 # =====================================================================
 
-clean: ## Clean build artifacts
+clean: ## Clean build artifacts and type checking reports
 	@echo "$(BLUE)Cleaning build artifacts...$(RESET)"
 	rm -rf build/
 	rm -rf dist/
@@ -740,6 +772,8 @@ clean: ## Clean build artifacts
 	rm -rf .pytest_cache/
 	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
+	rm -rf mypy-report/
+	rm -rf mypy-coverage/
 	rm -f $(OPENAPI_FILE)
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true

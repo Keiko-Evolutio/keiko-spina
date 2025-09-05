@@ -174,12 +174,23 @@ dev = [
     "mypy>=1.17.1",
     "pip-audit>=2.9.0",
 
-    # Type Stubs
+    # Type Stubs - Comprehensive coverage for enterprise typing
     "types-redis>=4.6.0.20241004",
-    "types-python-dateutil>=2.9.0.20250809",
-    "types-pytz>=2025.2.0.20250809",
-    "types-requests>=2.32.4.20250809",
-    "types-pyyaml>=6.0.12.20250809",
+    "types-python-dateutil>=2.9.0.20240906",
+    "types-pytz>=2024.2.0.20241003",
+    "types-requests>=2.32.0.20241016",
+    "types-pyyaml>=6.0.12.20240917",
+    "types-setuptools>=75.1.0.20240917",
+    "types-urllib3>=1.26.25.14",
+    "types-psycopg2>=2.9.21.20240819",
+    "types-pillow>=10.2.0.20240822",
+    "types-jsonschema>=4.23.0.20240813",
+    "types-click>=7.1.8",
+    "types-cryptography>=3.3.23.2",
+    "types-passlib>=1.7.7.20240819",
+    "types-python-jose>=3.3.4.20240106",
+    "types-orjson>=3.6.2",
+    "types-aiofiles>=24.1.0.20240626",
 
     # Git & Commit Tools
     "pre-commit>=4.3.0",
@@ -424,8 +435,13 @@ order-by-type = true
 [tool.ruff.pydocstyle]
 convention = "google"
 
+# ENTERPRISE-READY MYPY CONFIGURATION
+# Strict type checking for production-grade Python applications
 [tool.mypy]
 python_version = "3.12"
+
+# Core strict settings
+strict = false  # We enable strict mode per-module for gradual adoption
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -440,14 +456,171 @@ warn_unreachable = true
 strict_equality = true
 show_error_codes = true
 
+# Additional enterprise-grade checks
+disallow_any_unimported = true
+disallow_any_expr = false  # Too strict for gradual typing
+disallow_any_decorated = false  # Too strict for decorators
+disallow_any_explicit = false  # Allow explicit Any when needed
+disallow_any_generics = true
+disallow_subclassing_any = true
+implicit_reexport = false
+strict_optional = true
+
+# Error reporting
+show_column_numbers = true
+show_error_context = true
+color_output = true
+error_summary = true
+pretty = true
+
+# Performance and caching
+cache_dir = ".mypy_cache"
+sqlite_cache = true
+incremental = true
+
+# Import discovery
+namespace_packages = true
+explicit_package_bases = true
+ignore_missing_imports = false  # We handle missing imports explicitly
+
+# Platform and version
+platform = "linux"
+
+# STRICT TYPING FOR CORE MODULES
+# Gradually enable strict mode for critical business logic
 [[tool.mypy.overrides]]
 module = [
-    "opentelemetry.*",
+    "config.constants",
+    "config.deployment_mode",
+    "config.env_utils",  # Partial strict - legacy functions ignored
+    "core.constants",
+    "core.exceptions",
+    "core.versioning",
+    "data_models.*",
+    "auth.*",
+    "security.*",
+]
+strict = true
+disallow_any_expr = false  # Relaxed for legacy functions
+disallow_any_decorated = true
+
+# CORE LEGACY MODULES - Complex DI container with optional dependencies
+[[tool.mypy.overrides]]
+module = [
+    "core.container",
+    "core.error_handler",
+    "core.logging_strategy",
+]
+strict = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# STRICT TYPING FOR API LAYER
+[[tool.mypy.overrides]]
+module = [
+    "api.*",
+    "app.*",
+    "middleware.*",
+]
+strict = true
+disallow_any_generics = true
+
+# STRICT TYPING FOR AGENTS FRAMEWORK
+[[tool.mypy.overrides]]
+module = [
+    "agents.core.*",
+    "agents.base_agent",
+    "agents.constants",
+    "agents.metadata",
+]
+strict = true
+
+# MONITORING AND OBSERVABILITY
+[[tool.mypy.overrides]]
+module = [
+    "monitoring.*",
+    "observability.*",
+    "kei_logging.*",
+]
+strict = true
+
+# THIRD-PARTY LIBRARIES WITH MISSING TYPE STUBS
+# Minimize ignore_missing_imports to only truly untyped libraries
+[[tool.mypy.overrides]]
+module = [
+    # OpenTelemetry - some modules lack complete stubs
+    "opentelemetry.exporter.otlp.proto.grpc.*",
+    "opentelemetry.resourcedetector.*",
+
+    # Testing libraries
     "pact.*",
+    "testcontainers.*",
+
+    # Azure SDK - some modules lack stubs
+    "azure.ai.projects.*",
+    "azure.ai.agents.*",
+    "azure.ai.inference.*",
+    "azure.ai.evaluation.*",
+
+    # AI/ML libraries with incomplete stubs
+    "langchain_core.*",
+    "langgraph.*",
+    "langsmith.*",
+    "foundry_ai.*",
+    "prompty.*",
+
+    # Specialized libraries
     "jaeger_client.*",
-    "azure.*",
+    "graphviz.*",
+    "pydot.*",
+    "cv2.*",  # opencv-python
+    "PyMuPDF.*",
+
+    # Development tools
+    "memory_profiler.*",
+    "line_profiler.*",
+    "py_spy.*",
 ]
 ignore_missing_imports = true
+
+# LEGACY CODE - GRADUAL TYPING
+# Less strict for legacy modules during migration
+[[tool.mypy.overrides]]
+module = [
+    "agents.adapter.*",
+    "agents.chains.*",
+    "agents.custom.*",
+    "agents.factory.*",
+    "agents.memory.*",
+    "agents.registry.*",
+    "agents.tools.*",
+    "agents.workflows.*",
+    "services.*",
+    "workflows.*",
+    "voice.*",
+    "edge.*",
+    "grpc_services.*",
+    "infrastructure.*",
+    "kubernetes.*",
+    "n8n.*",
+    "scripts.*",
+    "specs.*",
+    "templates.*",
+]
+strict = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# TEST CODE - RELAXED TYPING
+[[tool.mypy.overrides]]
+module = [
+    "tests.*",
+    "conftest",
+]
+strict = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+ignore_errors = false  # Still check for basic errors
 
 # Pytest-Konfiguration wurde nach pytest.ini verschoben
 # um Duplikate zu vermeiden und eine einheitliche Quelle der Wahrheit zu haben
@@ -471,9 +644,10 @@ version_files = [
 path = "__init__.py"
 
 [tool.hatch.build.targets.wheel]
+# Include all packages and type information for distribution
 packages = [
     "agents",
-    "api", 
+    "api",
     "app",
     "audit_system",
     "auth",
@@ -496,6 +670,19 @@ packages = [
     "voice",
     "voice_performance",
     "voice_rate_limiting",
+]
+
+# PEP 561 Type Distribution Support
+# Include py.typed marker file for type information distribution
+[tool.hatch.build.targets.wheel.force-include]
+"py.typed" = "keiko_backend/py.typed"
+
+# Ensure type stubs and inline types are included
+[tool.hatch.build.targets.sdist]
+include = [
+    "py.typed",
+    "**/*.py",
+    "**/*.pyi",  # Type stub files
 ]
 
 [tool.hatch.envs.default]

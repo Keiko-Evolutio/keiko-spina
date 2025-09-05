@@ -104,11 +104,11 @@ jobs:
           cd backend
           uv run ruff format --check .
 
-      - name: 🔍 Run MyPy Type Checking
+      - name: 🔍 Run MyPy Type Checking (Enterprise-Grade)
         if: matrix.check == 'mypy'
         run: |
           cd backend
-          uv run mypy . --show-error-codes --pretty
+          uv run mypy . --show-error-codes --pretty --color-output
 
 
 
