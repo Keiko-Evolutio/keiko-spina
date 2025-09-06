@@ -317,6 +317,10 @@ coverage/
 .idea/workspace.xml
 .idea/tasks.xml
 .vscode/settings.json.bak
-/CLAUDE.md
 /openapi.json
 /SonarCube.md
+
+# Claude AI Assistant
+.claude/
+/CLAUDE.md
+/.mcp.json
