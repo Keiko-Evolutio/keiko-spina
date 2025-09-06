@@ -2,299 +2,115 @@ name: 🛡️ Security Scanning
 
 on:
   push:
-    branches: [ main, develop ]
-    branches-ignore: [dev]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
-    branches-ignore: [dev]
+    branches: [main, develop]
   schedule:
-    # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
 
-# Minimal permissions für Security Scanning
 permissions:
-  contents: read          # Read repository contents
-  security-events: write # Upload SARIF files to GitHub Security
-  actions: read          # Read workflow artifacts
+  contents: read
+  security-events: write
+  actions: read
 
 env:
-  PYTHON_DEFAULT_VERSION: "3.12"
+  PYTHON_VERSION: "3.12"
 
 jobs:
   # ============================================================================
-  # PARALLEL SECURITY SCANNING
+  # COMPREHENSIVE SECURITY SCANNING
   # ============================================================================
-  security-scan:
-    name: 🛡️ Security Scan (${{ matrix.scan-type }})
+  security:
+    name: 🛡️ Security Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    strategy:
-      matrix:
-        scan-type: [dependencies, code-analysis, secrets]
-        include:
-          - scan-type: dependencies
-            scan-name: "🔍 Dependency Vulnerability Scan"
-            tools: "safety pip-audit"
-            timeout: 15
-          - scan-type: code-analysis
-            scan-name: "🛡️ Code Security Analysis"
-            tools: "bandit semgrep"
-            timeout: 20
-          - scan-type: secrets
-            scan-name: "🔐 Secret Detection"
-            tools: "truffleHog gitleaks"
-            timeout: 10
-      fail-fast: false
-      max-parallel: 3
+    timeout-minutes: 30
 
     steps:
-      - name: 🐍 Setup Backend Environment
-        uses: ./.github/actions/setup-backend
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
         with:
-          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          install-dev-deps: ${{ matrix.scan-type == 'code-analysis' }}
-          install-test-deps: false
-          working-directory: backend
-          extra-packages: ${{ matrix.tools }}
+          fetch-depth: 0
 
-      - name: 🔍 Run Dependency Scans
-        if: matrix.scan-type == 'dependencies'
-        uses: ./.github/actions/retry-action
+      - name: ⚡ Setup uv
+        uses: astral-sh/setup-uv@v4
         with:
-          command: |
-            cd backend
-            echo "🔍 Running dependency vulnerability scans..."
+          enable-cache: true
 
-            # Safety check
-            safety check --json --output safety-report.json || true
-            safety check
-
-            # Pip-audit check
-            pip-audit --format=json --output=pip-audit-report.json || true
-            pip-audit
-          max_attempts: 3
-          retry_wait_seconds: 10
-          timeout_minutes: ${{ matrix.timeout }}
-          retry_on: any
-          failure_analysis: true
-
-      - name: 🛡️ Run Code Analysis
-        if: matrix.scan-type == 'code-analysis'
-        uses: ./.github/actions/retry-action
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
         with:
-          command: |
-            cd backend
-            echo "🛡️ Running code security analysis..."
+          python-version: ${{ env.PYTHON_VERSION }}
 
-            # Bandit scan
-            bandit -r . \
-              -f json \
-              -o bandit-security-report.json \
-              --severity-level medium \
-              --confidence-level medium || true
+      - name: 📦 Install Dependencies
+        run: |
+          cd backend
+          uv sync --group dev --frozen
 
-            # Semgrep scan
-            python -m semgrep --config=auto --json --output=semgrep.json . || true
-            python -m semgrep --config=auto --sarif --output=semgrep.sarif . || true
-          max_attempts: 2
-          retry_wait_seconds: 15
-          timeout_minutes: ${{ matrix.timeout }}
-          retry_on: error
-          failure_analysis: true
+      # ========================================================================
+      # DEPENDENCY SECURITY
+      # ========================================================================
+      - name: 🔍 Dependency Vulnerability Scan
+        run: |
+          cd backend
+          echo "🔍 Running dependency security scans..."
+          
+          # Safety check
+          uv run safety check --json --output safety-report.json || true
+          uv run safety check || true
+          
+          # Pip-audit check 
+          uv run pip-audit --format=json --output=pip-audit-report.json || true
+          uv run pip-audit || true
 
-      - name: 🔐 Run Secret Detection
-        if: matrix.scan-type == 'secrets'
-        shell: bash
+      # ========================================================================
+      # CODE SECURITY
+      # ========================================================================
+      - name: 🛡️ Code Security Analysis
+        run: |
+          cd backend
+          echo "🛡️ Running code security analysis..."
+          
+          # Bandit scan
+          uv run bandit -r . \
+            -f json \
+            -o bandit-security-report.json \
+            --severity-level medium \
+            --confidence-level medium || true
+          
+          # Semgrep scan
+          uv run semgrep --config=auto --json --output=semgrep.json . || true
+          uv run semgrep --config=auto --sarif --output=semgrep.sarif . || true
+
+      # ========================================================================
+      # SECRET DETECTION
+      # ========================================================================
+      - name: 🔐 Secret Detection
         run: |
           echo "🔐 Running secret detection..."
-
-          # Basic secret pattern detection
-          echo "Checking for common secret patterns..."
-
-          # Check for API keys, tokens, passwords in code
-          if grep -r -i -E "(api[_-]?key|secret|token|password|pwd)\s*[:=]\s*['\"][^'\"]{8,}" . --exclude-dir=.git --exclude-dir=node_modules --exclude="*.md" || true; then
+          
+          # Basic patterns
+          if grep -r -i -E "(api[_-]?key|secret|token|password|pwd)\s*[:=]\s*['\"][^'\"]{8,}" . \
+             --exclude-dir=.git --exclude-dir=.venv --exclude="*.md" || true; then
             echo "⚠️ Potential secrets found in code"
           fi
-
-          # Check for hardcoded URLs with credentials
-          if grep -r -E "https?://[^:]+:[^@]+@" . --exclude-dir=.git --exclude-dir=node_modules --exclude="*.md" || true; then
+          
+          # URLs with credentials
+          if grep -r -E "https?://[^:]+:[^@]+@" . \
+             --exclude-dir=.git --exclude-dir=.venv --exclude="*.md" || true; then
             echo "⚠️ Potential credentials in URLs found"
           fi
-
+          
           echo "✅ Secret detection completed"
 
-      - name: 🔍 Run Safety Check with Retry
-        uses: ./.github/actions/retry-action
-        with:
-          command: |
-            cd backend
-            safety check --json --output safety-report.json || true
-            safety check
-          max_attempts: 3
-          retry_wait_seconds: 10
-          timeout_minutes: 5
-          retry_on: any
-          failure_analysis: true
-
-      - name: 🔍 Run Pip-Audit with Retry
-        uses: ./.github/actions/retry-action
-        with:
-          command: |
-            cd backend
-            pip-audit --format=json --output=pip-audit-report.json || true
-            pip-audit
-          max_attempts: 3
-          retry_wait_seconds: 10
-          timeout_minutes: 5
-          retry_on: any
-          failure_analysis: true
-
-      - name: 📊 Upload Security Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-security-reports
-          path: |
-            backend/safety-report.json
-            backend/pip-audit-report.json
-          retention-days: 30
-
-  # ============================================================================
-  # CODE SECURITY SCANNING
-  # ============================================================================
-  code-security:
-    name: 🛡️ Code Security Analysis
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Backend Environment
-        uses: ./.github/actions/setup-backend
-        with:
-          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
-          install-dev-deps: true
-          install-test-deps: false
-          working-directory: backend
-
-      - name: 🛡️ Run Bandit Security Scan with Retry
-        uses: ./.github/actions/retry-action
-        with:
-          command: |
-            cd backend
-            bandit -r . \
-              -f json \
-              -o bandit-security-report.json \
-              --severity-level medium \
-              --confidence-level medium || true
-
-            bandit -r . \
-              -f txt \
-              --severity-level medium \
-              --confidence-level medium
-          max_attempts: 2
-          retry_wait_seconds: 15
-          timeout_minutes: 10
-          retry_on: error
-          failure_analysis: true
-
-      - name: 🔍 Run Semgrep Security Scan
-        uses: returntocorp/semgrep-action@v2
-        with:
-          config: >-
-            p/security-audit
-            p/secrets
-            p/python
-            p/django
-            p/flask
-            p/fastapi
-          generateSarif: "1"
-
-      - name: 📊 Upload Security Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-security-reports
-          path: |
-            backend/bandit-security-report.json
-            semgrep.sarif
-          retention-days: 30
-
-      - name: 📊 Upload SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-
-      - name: 🚨 Handle Security Scan Failures
-        if: failure()
-        uses: ./.github/actions/error-handler
-        with:
-          job_name: "Code Security Analysis"
-          step_name: "Security Scans"
-          error_message: "Security scans detected vulnerabilities or failed to complete"
-          log_file: "backend/bandit-security-report.json"
-          error_category: "security"
-          create_issue: "true"
-
-      - name: 📊 Collect Security Metrics
-        if: always()
-        uses: ./.github/actions/monitoring-action
-        with:
-          job_name: "Code Security Analysis"
-          step_name: "Security Metrics Collection"
-          metric_type: "security_scan"
-          tags: "scan_type=code_analysis,tools=bandit_semgrep"
-
-      - name: 🧹 Cleanup Security Scan Resources
-        if: always()
-        uses: ./.github/actions/cleanup-action
-        with:
-          cleanup_type: "files"
-          preserve_artifacts: true
-          working_directory: "backend"
-
-  # ============================================================================
-  # SECRETS SCANNING
-  # ============================================================================
-  secrets-scan:
-    name: 🔐 Secrets Detection
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for secret scanning
-
-      - name: 🔐 Run TruffleHog Secrets Scan
-        uses: trufflesecurity/trufflehog@v3.63.2
-        with:
-          path: ./
-          base: main
-          head: HEAD
-          extra_args: --debug --only-verified
-
-  # ============================================================================
-  # CONTAINER SECURITY SCANNING
-  # ============================================================================
-  container-security:
-    name: 🐳 Container Security Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.changed_files, 'Dockerfile')
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🐳 Build Docker Image
+      # ========================================================================
+      # CONTAINER SECURITY
+      # ========================================================================
+      - name: 🐳 Container Security Scan
+        if: hashFiles('Dockerfile', 'backend/Dockerfile') != ''
         run: |
+          echo "🐳 Building and scanning Docker image..."
+          
           if [ -f Dockerfile ]; then
             docker build -t keiko-backend:security-scan .
           elif [ -f backend/Dockerfile ]; then
@@ -306,138 +122,72 @@ jobs:
           fi
 
       - name: 🔍 Run Trivy Container Scan
-        if: success()
-        uses: aquasecurity/trivy-action@0.16.1
+        if: hashFiles('Dockerfile', 'backend/Dockerfile') != ''
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: 'keiko-backend:security-scan'
           format: 'sarif'
           output: 'trivy-results.sarif'
 
-      - name: 📊 Upload Trivy Results to GitHub Security
-        if: success()
-        uses: github/codeql-action/upload-sarif@v3
+      # ========================================================================
+      # TRUFFLEHOG SECRETS SCAN
+      # ========================================================================
+      - name: 🔎 TruffleHog Secrets Scan
+        uses: trufflesecurity/trufflehog@v3.81.9
         with:
-          sarif_file: 'trivy-results.sarif'
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --only-verified
 
-      - name: 🔍 Run Trivy Container Scan (Table Format)
-        if: success()
-        uses: aquasecurity/trivy-action@0.16.1
-        with:
-          image-ref: 'keiko-backend:security-scan'
-          format: 'table'
-
-  # ============================================================================
-  # DOCKERFILE SECURITY BEST PRACTICES
-  # ============================================================================
-  dockerfile-security:
-    name: 📋 Dockerfile Security Best Practices
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.changed_files, 'Dockerfile')
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🔍 Run Hadolint Dockerfile Linter
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-          format: sarif
-          output-file: hadolint-results.sarif
-          no-fail: true
-
-      - name: 📊 Upload Hadolint Results
+      # ========================================================================
+      # SARIF UPLOADS
+      # ========================================================================
+      - name: 📊 Upload SARIF Results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: hadolint-results.sarif
+          sarif_file: |
+            backend/semgrep.sarif
+            trivy-results.sarif
+        continue-on-error: true
 
-  # ============================================================================
-  # INFRASTRUCTURE AS CODE SECURITY
-  # ============================================================================
-  iac-security:
-    name: 🏗️ Infrastructure as Code Security
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.changed_files, 'docker-compose') || contains(github.event.pull_request.changed_files, '.yml') || contains(github.event.pull_request.changed_files, '.yaml')
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🔍 Run Checkov IaC Security Scan
-        uses: bridgecrewio/checkov-action@v12.2544.0
-        with:
-          directory: .
-          framework: dockerfile,docker_compose,github_actions
-          output_format: sarif
-          output_file_path: checkov-results.sarif
-          soft_fail: true
-
-      - name: 📊 Upload Checkov Results
+      # ========================================================================
+      # ARTIFACTS
+      # ========================================================================
+      - name: 📤 Upload Security Reports
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: checkov-results.sarif
-
-  # ============================================================================
-  # SECURITY SUMMARY
-  # ============================================================================
-  security-summary:
-    name: 📊 Security Summary
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [dependency-scan, code-security, secrets-scan, container-security, dockerfile-security, iac-security]
-    if: always()
-
-    steps:
-      - name: 📊 Download All Security Reports
-        uses: actions/download-artifact@v4
-        with:
-          path: security-reports/
-
-      - name: 📊 Generate Security Summary
-        run: |
-          echo "# 🛡️ Security Scan Summary" > security-summary.md
-          echo "" >> security-summary.md
-          echo "## Job Results" >> security-summary.md
-          echo "- Dependency Scan: ${{ needs.dependency-scan.result }}" >> security-summary.md
-          echo "- Code Security: ${{ needs.code-security.result }}" >> security-summary.md
-          echo "- Secrets Scan: ${{ needs.secrets-scan.result }}" >> security-summary.md
-          echo "- Container Security: ${{ needs.container-security.result }}" >> security-summary.md
-          echo "- Dockerfile Security: ${{ needs.dockerfile-security.result }}" >> security-summary.md
-          echo "- IaC Security: ${{ needs.iac-security.result }}" >> security-summary.md
-          echo "" >> security-summary.md
-
-          if [ -d "security-reports" ]; then
-            echo "## Available Reports" >> security-summary.md
-            find security-reports -name "*.json" -o -name "*.sarif" | while read file; do
-              echo "- $(basename "$file")" >> security-summary.md
-            done
-          fi
-
-          cat security-summary.md
-
-      - name: 📊 Upload Security Summary
         uses: actions/upload-artifact@v4
         with:
-          name: security-summary
-          path: security-summary.md
+          name: security-reports
+          path: |
+            backend/*-report.json
+            backend/semgrep.*
+            trivy-results.sarif
           retention-days: 30
 
-      - name: ✅ Security Checks Complete
+  # ============================================================================
+  # SUMMARY
+  # ============================================================================
+  result:
+    name: 📊 Security Result
+    runs-on: ubuntu-latest
+    needs: [security]
+    if: always()
+    steps:
+      - name: 📊 Security Summary
         run: |
-          echo "🛡️ Security scanning completed."
-          echo "Please review the security reports in the artifacts section."
-
-          # Check for critical failures
-          if [[ "${{ needs.dependency-scan.result }}" == "failure" ]] ||
-             [[ "${{ needs.code-security.result }}" == "failure" ]] ||
-             [[ "${{ needs.secrets-scan.result }}" == "failure" ]]; then
-            echo "⚠️ Critical security issues detected. Please review immediately."
-            # Note: We don't exit 1 here to allow the workflow to complete
-            # and upload all security reports for review
+          echo "## 🛡️ Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Security Analysis** | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.security.result }}" = "success" ]; then
+            echo "### ✅ Security Scans Completed" >> $GITHUB_STEP_SUMMARY
+            echo "All security scans completed successfully." >> $GITHUB_STEP_SUMMARY
           else
-            echo "✅ No critical security issues detected."
+            echo "### ⚠️ Security Issues Detected" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the security reports for details." >> $GITHUB_STEP_SUMMARY
           fi

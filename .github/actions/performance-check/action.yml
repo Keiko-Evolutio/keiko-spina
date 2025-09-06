@@ -1,0 +1,71 @@
+name: 'Performance Check'
+description: 'Simple performance monitoring with thresholds'
+branding:
+  icon: 'activity'
+  color: 'orange'
+
+inputs:
+  job-name:
+    description: 'Name of the job being monitored'
+    required: true
+  sla-threshold:
+    description: 'SLA threshold in seconds'
+    required: false
+    default: '300'
+  performance-endpoint:
+    description: 'API endpoint to test (optional)'
+    required: false
+    default: ''
+
+outputs:
+  execution-time:
+    description: 'Execution time in seconds'
+    value: ${{ steps.monitor.outputs.execution-time }}
+  sla-status:
+    description: 'SLA compliance status'
+    value: ${{ steps.monitor.outputs.sla-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📊 Performance Check
+      id: monitor
+      shell: bash
+      run: |
+        echo "📊 Performance check for: ${{ inputs.job-name }}"
+        
+        # Record start time if not exists
+        if [ ! -f "/tmp/${{ inputs.job-name }}-start.time" ]; then
+          date +%s > "/tmp/${{ inputs.job-name }}-start.time"
+          echo "🚀 Started monitoring ${{ inputs.job-name }}"
+          echo "execution-time=0" >> $GITHUB_OUTPUT
+          echo "sla-status=running" >> $GITHUB_OUTPUT
+        else
+          # Calculate execution time
+          START_TIME=$(cat "/tmp/${{ inputs.job-name }}-start.time")
+          CURRENT_TIME=$(date +%s)
+          EXECUTION_TIME=$((CURRENT_TIME - START_TIME))
+          
+          # Check SLA
+          SLA_THRESHOLD=${{ inputs.sla-threshold }}
+          if [ $EXECUTION_TIME -le $SLA_THRESHOLD ]; then
+            SLA_STATUS="pass"
+            echo "✅ SLA met: ${EXECUTION_TIME}s ≤ ${SLA_THRESHOLD}s"
+          else
+            SLA_STATUS="fail"  
+            echo "❌ SLA exceeded: ${EXECUTION_TIME}s > ${SLA_THRESHOLD}s"
+          fi
+          
+          # Performance endpoint check
+          if [ -n "${{ inputs.performance-endpoint }}" ]; then
+            echo "🔍 Testing endpoint: ${{ inputs.performance-endpoint }}"
+            RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "${{ inputs.performance-endpoint }}" || echo "0")
+            echo "📊 Response time: ${RESPONSE_TIME}s"
+          fi
+          
+          echo "execution-time=$EXECUTION_TIME" >> $GITHUB_OUTPUT
+          echo "sla-status=$SLA_STATUS" >> $GITHUB_OUTPUT
+          
+          # Cleanup
+          rm -f "/tmp/${{ inputs.job-name }}-start.time"
+        fi

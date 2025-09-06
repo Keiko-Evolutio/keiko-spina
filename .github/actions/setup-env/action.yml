@@ -1,0 +1,45 @@
+name: 'Setup Python Environment'
+description: 'Sets up Python with uv for fast dependency management'
+branding:
+  icon: 'settings'
+  color: 'blue'
+
+inputs:
+  python-version:
+    description: 'Python version'
+    required: false
+    default: '3.12'
+  working-directory:
+    description: 'Working directory'
+    required: false
+    default: 'backend'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+
+    - name: ⚡ Setup uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: 📦 Install Dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f "uv.lock" ]; then
+          uv sync --group dev --group test --frozen
+        else
+          echo "⚠️ No uv.lock found - using pip fallback"
+          python -m pip install --upgrade pip
+          if [ -f "pyproject.toml" ]; then
+            pip install -e .[dev,test]
+          fi
+        fi

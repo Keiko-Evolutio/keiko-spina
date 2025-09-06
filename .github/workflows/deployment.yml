@@ -1,10 +1,8 @@
-name: 🚀 Deployment Pipeline
+name: 🚀 Deploy
 
 on:
   push:
-    branches:
-      - main
-      - release/*
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -12,28 +10,22 @@ on:
         required: true
         default: 'staging'
         type: choice
-        options:
-          - staging
-          - production
-      deployment_type:
-        description: 'Type of deployment'
-        required: false
-        default: 'standard'
-        type: choice
-        options:
-          - standard
-          - hotfix
-          - rollback
+        options: [staging, production]
       skip_tests:
-        description: 'Skip tests (emergency only)'
+        description: 'Skip pre-deployment tests (emergency only)'
         required: false
         default: false
         type: boolean
 
+permissions:
+  contents: read
+  deployments: write
+  actions: read
+
 env:
-  DEPLOYMENT_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
-  DEPLOYMENT_TYPE: ${{ github.event.inputs.deployment_type || 'standard' }}
+  TARGET_ENV: ${{ github.event.inputs.environment || 'staging' }}
   SKIP_TESTS: ${{ github.event.inputs.skip_tests || 'false' }}
+  PYTHON_VERSION: "3.12"
 
 jobs:
   # ============================================================================

@@ -94,6 +94,10 @@
   "pip_requirements": {
     "fileMatch": ["(^|/)requirements.*\\.txt$", "(^|/)requirements.*\\.in$"]
   },
+  "uv": {
+    "enabled": true,
+    "fileMatch": ["(^|/)uv\\.lock$", "(^|/)pyproject\\.toml$"]
+  },
   "regexManagers": [
     {
       "description": "Update Python version in pyproject.toml",
