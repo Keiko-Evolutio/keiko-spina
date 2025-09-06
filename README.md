@@ -142,4 +142,3 @@ Event-Store-System mit unveränderlichen Event-Streams für vollständige Audit-
 ### Sustainability Initiative
 - **Green Computing:** KI-gesteuerte Energieoptimierung mit Carbon-Aware Computing
 - **Renewable Energy Integration:** Verschiebung rechenintensiver Aufgaben in Regionen mit sauberer Energie
-- **Circular Computing:** 100% Hardware-Recycling und Energy Harvesting
