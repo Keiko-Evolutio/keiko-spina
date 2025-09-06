@@ -10,9 +10,9 @@ keiko-backbone bildet das technische Fundament und fungiert als Infrastructure S
 keiko-backbone implementiert das Prinzip der zentralisierten Infrastrukturdienste bei gleichzeitiger Ermöglichung dezentraler Agent-Operationen. Diese Dualität ermöglicht sowohl die notwendige Kontrolle und Übersicht als auch die Flexibilität und Skalierbarkeit für moderne Multi-Agent-Systeme.
 
 **Performance-Beitrag:**
-- **45% Reduktion** in Service-Hand-offs durch intelligente Orchestrierung
-- **3x Verbesserung** in Entscheidungsgeschwindigkeit durch parallele Agent-Verarbeitung
-- **60% Steigerung** der Ergebnisgenauigkeit durch kollektive Intelligenz-Mechanismen
+- **Reduktion** in Service-Hand-offs durch intelligente Orchestrierung
+- **Verbesserung** in Entscheidungsgeschwindigkeit durch parallele Agent-Verarbeitung
+- **Steigerung** der Ergebnisgenauigkeit durch kollektive Intelligenz-Mechanismen
 
 ### Master Enterprise Orchestrator
 Als zentraler Infrastructure Hub koordiniert keiko-backbone enterprise-weite Concerns zwischen allen Systemkomponenten und fungiert als Master System Orchestrator für Disaster Recovery, Compliance und Cost Management.
